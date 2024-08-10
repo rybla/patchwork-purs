@@ -2,11 +2,10 @@ module Patchwork.Model where
 
 import Prelude
 
-import Data.Enum (class Enum)
 import Data.Lens (Iso')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Map (Map)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
 import Data.TotalMap (TotalMap)
@@ -24,6 +23,7 @@ newtype Model = Model
   , currentCirclePos :: CirclePos
   , players :: TotalMap PlayerId Player
   , activePlayer :: PlayerId
+  , maxTime :: Int
   , winner :: Maybe PlayerId
   }
 
@@ -33,6 +33,8 @@ _patchCircle = Proxy :: Proxy "patchCircle"
 _currentCirclePos = Proxy :: Proxy "currentCirclePos"
 _players = Proxy :: Proxy "players"
 _activePlayer = Proxy :: Proxy "activePlayer"
+_maxTime = Proxy :: Proxy "maxTime"
+_winner = Proxy :: Proxy "winner"
 
 derive instance Newtype Model _
 
@@ -46,9 +48,7 @@ derive instance Newtype PlayerId _
 derive newtype instance Eq PlayerId
 derive newtype instance Ord PlayerId
 
-instance Enum PlayerId where
-  succ (PlayerId b) = Just (PlayerId (not b))
-  pred (PlayerId b) = Just (PlayerId (not b))
+nextPlayerId (PlayerId b) = PlayerId (not b)
 
 --------------------------------------------------------------------------------
 -- PatchId
@@ -78,6 +78,7 @@ newtype Player = Player
   }
 
 _Player = _Newtype :: Iso' Player _
+_time = Proxy :: Proxy "time"
 _name = Proxy :: Proxy "name"
 _quilt = Proxy :: Proxy "quilt"
 _buttons = Proxy :: Proxy "buttons"
@@ -124,9 +125,7 @@ derive newtype instance Eq CirclePos
 derive newtype instance Ord CirclePos
 
 --------------------------------------------------------------------------------
--- Action
+-- TurnAction
 --------------------------------------------------------------------------------
 
-data Action
-  = Buy { selection :: CirclePos }
-  | Wait { duration :: Int }
+data TurnAction = Buy | Wait | Pass

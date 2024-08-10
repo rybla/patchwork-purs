@@ -3,7 +3,9 @@
   "type": "module",
   "scripts": {
     "build": "bun spago build",
-    "bundle": "bun spago bundle --module Patchwork.Main --outfile ./dist/main.js"
+    "Simple1.bundle": "bun spago bundle --module Patchwork.App.Simple1 --outfile ./dist/simple1/main.js",
+    "Simple1": "bun run Simple1.bundle && bun run serve",
+    "serve": "http-server ./dist"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -13,6 +15,7 @@
   },
   "dependencies": {
     "esbuild": "^0.23.0",
+    "http-server": "^14.1.1",
     "purescript": "^0.15.16-3",
     "spago": "^0.93.37"
   }
