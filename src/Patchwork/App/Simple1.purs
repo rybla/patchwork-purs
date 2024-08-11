@@ -33,8 +33,7 @@ main = HA.runHalogenAff (HVD.runUI component {} =<< HA.awaitBody)
 type Input = {}
 
 type State =
-  { count :: Int
-  , mb_widget :: Maybe Widget
+  { mb_widget :: Maybe Widget
   , model :: Model
   }
 
@@ -61,8 +60,7 @@ component = H.mkComponent { initialState, eval, render }
   where
   initialState :: Input -> State
   initialState _ =
-    { count: 0
-    , model: Model
+    { model: Model
         { patches: Map.empty
         , maxTime: 0
         , patchCircle: Map.empty
@@ -97,12 +95,11 @@ component = H.mkComponent { initialState, eval, render }
       runInteraction (InteractionT fm)
       pure unit
 
-  render { count, mb_widget, model: Model model } =
+  render { mb_widget, model: Model model } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 0.5em" ]
       ( [ [ HH.div [] [ HH.text $ "activePlayer: " <> show model.activePlayer ] ]
         , [ HH.button [ HE.onClick Start ] [ HH.text "Start" ] ]
-        , [ HH.div [] [ HH.text $ "count: " <> show count ] ]
         , mb_widget # maybe [] \widget ->
             [ HH.slot (Proxy :: Proxy "widget") unit widget {} WidgetOutput_Action
             ]
@@ -132,7 +129,7 @@ runInteraction (InteractionT fm) = do
             }
           render {} =
             HH.div
-              [ HP.style "display: flex; flex-direction: column: gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HP.style "display: flex; flex-direction: row; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
               [ HH.text "this is a widget"
               , HH.button [ HE.onClick (const Buy) ] [ HH.text "Buy" ]
               , HH.button [ HE.onClick (const Wait) ] [ HH.text "Wait" ]
