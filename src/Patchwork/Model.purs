@@ -26,7 +26,6 @@ newtype Model = Model
   , currentCirclePos :: CirclePos
   , players :: TotalMap PlayerId Player
   , activePlayer :: PlayerId
-  , maxTime :: Int
   , winner :: Maybe PlayerId
   }
 
@@ -68,6 +67,9 @@ nextPlayerId (PlayerId b) = PlayerId (not b)
 newtype PatchId = PatchId Int
 
 derive instance Newtype PatchId _
+derive newtype instance Show PatchId
+derive newtype instance Eq PatchId
+derive newtype instance Ord PatchId
 
 --------------------------------------------------------------------------------
 -- PatchCircleIndex

@@ -13,7 +13,7 @@ import Data.Identity (Identity)
 import Data.Newtype (class Newtype)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Patchwork.Model (Patch, PlayerId, Quilt, TurnAction)
+import Patchwork.Model (Patch, PatchId, PlayerId, Quilt, TurnAction)
 
 --------------------------------------------------------------------------------
 -- InteractionF
@@ -25,6 +25,7 @@ type Interaction = InteractionT Identity
 data InteractionF m a
   = Lift_InteractionF (Lift m a)
   | ChooseTurnAction_InteractionF (ChooseTurnAction m a)
+  | ChoosePatchFromCircle_InteractionF (ChoosePatchFromCircle m a)
   | PlacePatch_InteractionF (PlacePatch m a)
   | ChooseWaitDuration_InteractionF (ChooseWaitDuration m a)
   | SetWinner_InteractionF (SetWinner m a)
@@ -38,25 +39,31 @@ derive instance Functor m => Functor (Lift m)
 instance Inject Lift where
   inject = InteractionT <<< liftF <<< Lift_InteractionF
 
-newtype ChooseTurnAction m (a :: Type) = ChooseTurnAction { target :: PlayerId, k :: { selection :: TurnAction } -> m a }
+newtype ChooseTurnAction m (a :: Type) = ChooseTurnAction { k :: { selection :: TurnAction } -> m a }
 
 derive instance Functor m => Functor (ChooseTurnAction m)
 instance Inject ChooseTurnAction where
   inject = InteractionT <<< liftF <<< ChooseTurnAction_InteractionF
 
-newtype PlacePatch m (a :: Type) = PlacePatch { target :: PlayerId, patch :: Patch, quilt :: Quilt, k :: { quilt' :: Quilt } -> m a }
+newtype ChoosePatchFromCircle m (a :: Type) = ChoosePatchFromCircle { k :: { selection :: PatchId } -> m a }
+
+derive instance Functor m => Functor (ChoosePatchFromCircle m)
+instance Inject ChoosePatchFromCircle where
+  inject = InteractionT <<< liftF <<< ChoosePatchFromCircle_InteractionF
+
+newtype PlacePatch m (a :: Type) = PlacePatch { patch :: Patch, quilt :: Quilt, k :: { quilt' :: Quilt } -> m a }
 
 derive instance Functor m => Functor (PlacePatch m)
 instance Inject PlacePatch where
   inject = InteractionT <<< liftF <<< PlacePatch_InteractionF
 
-newtype ChooseWaitDuration m (a :: Type) = ChooseWaitDuration { target :: PlayerId, time :: Int, maxTime :: Int, k :: { duration :: Int } -> m a }
+newtype ChooseWaitDuration m (a :: Type) = ChooseWaitDuration { k :: { duration :: Int } -> m a }
 
 derive instance Functor m => Functor (ChooseWaitDuration m)
 instance Inject ChooseWaitDuration where
   inject = InteractionT <<< liftF <<< ChooseWaitDuration_InteractionF
 
-newtype SetWinner m (a :: Type) = SetWinner { target :: PlayerId, k :: {} -> m a }
+newtype SetWinner m (a :: Type) = SetWinner { winner :: PlayerId, k :: {} -> m a }
 
 derive instance Functor m => Functor (SetWinner m)
 instance Inject SetWinner where

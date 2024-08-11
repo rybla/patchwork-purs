@@ -21,8 +21,8 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver as HVD
-import Patchwork.Interaction (ChooseTurnAction(..), ChooseWaitDuration(..), InteractionF(..), InteractionT(..), Lift(..), PlacePatch(..), SetWinner(..), inject)
-import Patchwork.Model (Model(..), Player(..), PlayerId(..), TurnAction(..))
+import Patchwork.Interaction (ChooseTurnAction(..), InteractionF(..), InteractionT(..), Lift(..), inject)
+import Patchwork.Model (Model(..), Player(..), TurnAction(..), nextPlayerId)
 import Patchwork.Util (todo)
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
@@ -62,7 +62,6 @@ component = H.mkComponent { initialState, eval, render }
   initialState _ =
     { model: Model
         { patches: Map.empty
-        , maxTime: 0
         , patchCircle: Map.empty
         , currentCirclePos: wrap 0
         , activePlayer: bottom
@@ -84,8 +83,8 @@ component = H.mkComponent { initialState, eval, render }
     Start _event -> do
       let
         m _ = do
-          void $ inject $ ChooseTurnAction { target: PlayerId false, k: pure }
-          void $ inject $ ChooseTurnAction { target: PlayerId true, k: pure }
+          void $ inject $ ChooseTurnAction { k: pure }
+          void $ inject $ ChooseTurnAction { k: pure }
           m unit
       runInteraction $ void $ m unit
       pure unit
@@ -118,8 +117,11 @@ runInteraction (InteractionT fm) = do
       model' <- execStateT ma model # lift
       modify_ _ { model = model' }
       pure (pure unit)
-    ChooseTurnAction_InteractionF (ChooseTurnAction { target, k }) -> do
-      modify_ \env -> env { model = env.model # over Model _ { activePlayer = target } }
+    ChooseTurnAction_InteractionF (ChooseTurnAction { k }) -> do
+      modify_ \env -> env
+        { model = env.model # over Model
+            \model' -> model' { activePlayer = nextPlayerId model'.activePlayer }
+        }
       let
         widget = H.mkComponent { initialState, eval, render }
           where
@@ -139,6 +141,4 @@ runInteraction (InteractionT fm) = do
               ]
       modify_ _ { mb_widget = Just widget }
       pure (pure unit)
-    PlacePatch_InteractionF (PlacePatch {}) -> todo ""
-    ChooseWaitDuration_InteractionF (ChooseWaitDuration {}) -> todo ""
-    SetWinner_InteractionF (SetWinner {}) -> todo ""
+    _ -> todo ""
