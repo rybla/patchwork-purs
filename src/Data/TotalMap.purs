@@ -8,6 +8,7 @@ module Data.TotalMap
 
 import Prelude
 
+import Data.Argonaut (class EncodeJson)
 import Data.Enum (class BoundedEnum, enumFromTo)
 import Data.Lens (Lens', lens')
 import Data.Map (Map)
@@ -22,9 +23,12 @@ import Patchwork.Util ((∘))
 
 newtype TotalMap k v = TotalMap (Map k v)
 
+derive newtype instance (Show k, Show v) => Show (TotalMap k v)
 derive newtype instance Functor (TotalMap k)
 derive newtype instance Foldable (TotalMap k)
 derive newtype instance Traversable (TotalMap k)
+
+derive newtype instance (EncodeJson k, Ord k, EncodeJson v) => EncodeJson (TotalMap k v)
 
 toUnfoldable :: forall f k v. Unfoldable f => TotalMap k v -> f (k /\ v)
 toUnfoldable (TotalMap m) = Map.toUnfoldable m

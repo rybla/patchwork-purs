@@ -2,6 +2,8 @@ package:
   name: patchwork-purs
   dependencies:
     - aff-promise
+    - argonaut
+    - argonaut-generic
     - arrays
     - console
     - effect

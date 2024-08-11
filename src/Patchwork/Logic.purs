@@ -15,6 +15,7 @@ import Data.Maybe (Maybe(..), maybe, maybe')
 import Data.TotalMap (at')
 import Data.TotalMap as TotalMap
 import Data.Traversable (sequence)
+import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
@@ -34,21 +35,44 @@ _model = Proxy :: Proxy "model"
 -- Main
 --------------------------------------------------------------------------------
 
-main :: forall m. MonadAff m => M m Unit
-main = do
+main :: forall m. MonadAff m => Unit -> M m Unit
+main _ = do
+  Console.log "[main]"
   -- check if there is a winner
   gets (view (_Model ∘ prop _winner)) >>= case _ of
     Nothing -> do
+      Console.log "[main] no winner"
       -- no winner, so active player takes action
       inject (ChooseTurnAction { k: pure }) >>= case _ of
         { selection: Buy } -> buy
         { selection: Wait } -> wait
         { selection: Pass } -> pure unit
-      _Model ∘ prop _activePlayer %= nextPlayerId
-      main
+      updateActivePlayer
+      main unit
     Just _playerId -> do
+      Console.log "[main] yes winner"
       -- yes winner, so game is over
       todo "how to indicate winner?"
+  winner <- gets (view (_Model ∘ prop _winner))
+  Console.log ("[main] winer = " <> show winner)
+
+-- | Set model.activePlayer to be the player with the most time.
+updateActivePlayer
+  :: forall m. MonadAff m => M m Unit
+updateActivePlayer = do
+  Console.log "[updateActivePlayer]"
+  playersTimes <- TotalMap.fromFunctionM \playerId -> do
+    player <- gets (view (_Model ∘ prop _players ∘ at' playerId ∘ _Player))
+    pure player.time
+  let
+    activePlayer =
+      playersTimes
+        # TotalMap.toUnfoldable
+        # Array.sortBy (\(_ /\ time1) (_ /\ time2) -> compare time1 time2)
+        # Array.last
+        # maybe' (\_ -> unsafeCrashWith "impossible: 0 players") identity
+        # fst
+  _Model ∘ prop _activePlayer .= activePlayer
 
 --------------------------------------------------------------------------------
 -- Functions
@@ -58,8 +82,8 @@ buy
   :: forall m. MonadAff m => M m Unit
 buy = do
   Console.log "[buy]"
-  patchId <- inject (ChoosePatchFromCircle { k: pure })
-  Patch patch <- removePatchFromPatchCircle (todo "")
+  { pos } <- inject (ChoosePatchFromCircle { k: pure })
+  Patch patch <- removePatchFromPatchCircle pos
   target <- gets (view (_Model ∘ prop _activePlayer))
   spendButtons target patch.buttonPrice
   spendDuration target patch.durationPrice

@@ -13,7 +13,7 @@ import Data.Identity (Identity)
 import Data.Newtype (class Newtype)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Patchwork.Model (Patch, PatchId, PlayerId, Quilt, TurnAction)
+import Patchwork.Model (CirclePos(..), Patch, PatchId, PlayerId, Quilt, TurnAction)
 
 --------------------------------------------------------------------------------
 -- InteractionF
@@ -30,6 +30,15 @@ data InteractionF m a
   | ChooseWaitDuration_InteractionF (ChooseWaitDuration m a)
   | SetWinner_InteractionF (SetWinner m a)
 
+labelInteractionF :: forall m a. InteractionF m a -> String
+labelInteractionF = case _ of
+  Lift_InteractionF _ -> "Lift"
+  ChooseTurnAction_InteractionF _ -> "ChooseTurnAction"
+  ChoosePatchFromCircle_InteractionF _ -> "ChoosePatchFromCircle"
+  PlacePatch_InteractionF _ -> "PlacePatch"
+  ChooseWaitDuration_InteractionF _ -> "ChooseWaitDuration"
+  SetWinner_InteractionF _ -> "SetWinner"
+
 class Inject f where
   inject :: forall m a. Monad m => f m a -> InteractionT m a
 
@@ -45,7 +54,7 @@ derive instance Functor m => Functor (ChooseTurnAction m)
 instance Inject ChooseTurnAction where
   inject = InteractionT <<< liftF <<< ChooseTurnAction_InteractionF
 
-newtype ChoosePatchFromCircle m (a :: Type) = ChoosePatchFromCircle { k :: { selection :: PatchId } -> m a }
+newtype ChoosePatchFromCircle m (a :: Type) = ChoosePatchFromCircle { k :: { pos :: CirclePos } -> m a }
 
 derive instance Functor m => Functor (ChoosePatchFromCircle m)
 instance Inject ChoosePatchFromCircle where

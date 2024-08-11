@@ -2,6 +2,8 @@ module Patchwork.Model where
 
 import Prelude
 
+import Data.Argonaut (class EncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Iso')
@@ -39,6 +41,10 @@ _maxTime = Proxy :: Proxy "maxTime"
 _winner = Proxy :: Proxy "winner"
 
 derive instance Newtype Model _
+derive instance Generic Model _
+derive newtype instance Show Model
+instance EncodeJson Model where
+  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- PlayerId
@@ -47,6 +53,7 @@ derive instance Newtype Model _
 newtype PlayerId = PlayerId Boolean
 
 derive instance Newtype PlayerId _
+derive instance Generic PlayerId _
 derive newtype instance Eq PlayerId
 derive newtype instance Ord PlayerId
 derive newtype instance Enum PlayerId
@@ -58,6 +65,9 @@ instance Show PlayerId where
     PlayerId false -> "Player 1"
     PlayerId true -> "Player 2"
 
+instance EncodeJson PlayerId where
+  encodeJson x = genericEncodeJson x
+
 nextPlayerId (PlayerId b) = PlayerId (not b)
 
 --------------------------------------------------------------------------------
@@ -67,9 +77,13 @@ nextPlayerId (PlayerId b) = PlayerId (not b)
 newtype PatchId = PatchId Int
 
 derive instance Newtype PatchId _
+derive instance Generic PatchId _
 derive newtype instance Show PatchId
 derive newtype instance Eq PatchId
 derive newtype instance Ord PatchId
+
+instance EncodeJson PatchId where
+  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- PatchCircleIndex
@@ -78,6 +92,11 @@ derive newtype instance Ord PatchId
 newtype PatchCircleIndex = PatchCircleIndex Int
 
 derive instance Newtype PatchCircleIndex _
+derive instance Generic PatchCircleIndex _
+derive newtype instance Show PatchCircleIndex
+
+instance EncodeJson PatchCircleIndex where
+  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- Player
@@ -97,6 +116,11 @@ _quilt = Proxy :: Proxy "quilt"
 _buttons = Proxy :: Proxy "buttons"
 
 derive instance Newtype Player _
+derive instance Generic Player _
+derive newtype instance Show Player
+
+instance EncodeJson Player where
+  encodeJson x = genericEncodeJson x
 
 type Quilt = Map QuiltPos PatchId
 
@@ -118,6 +142,11 @@ _layout = Proxy :: Proxy "layout"
 _buttonLayout = Proxy :: Proxy "buttonLayout"
 
 derive instance Newtype Patch _
+derive instance Generic Patch _
+derive newtype instance Show Patch
+
+instance EncodeJson Patch where
+  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- QuiltPos
@@ -126,6 +155,13 @@ derive instance Newtype Patch _
 newtype QuiltPos = QuiltPos (Int /\ Int)
 
 derive instance Newtype QuiltPos _
+derive instance Generic QuiltPos _
+derive newtype instance Show QuiltPos
+derive newtype instance Eq QuiltPos
+derive newtype instance Ord QuiltPos
+
+instance EncodeJson QuiltPos where
+  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- CirclePos
@@ -134,8 +170,13 @@ derive instance Newtype QuiltPos _
 newtype CirclePos = CirclePos Int
 
 derive instance Newtype CirclePos _
+derive instance Generic CirclePos _
+derive newtype instance Show CirclePos
 derive newtype instance Eq CirclePos
 derive newtype instance Ord CirclePos
+
+instance EncodeJson CirclePos where
+  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- TurnAction
@@ -147,3 +188,6 @@ derive instance Generic TurnAction _
 
 instance Show TurnAction where
   show x = genericShow x
+
+instance EncodeJson TurnAction where
+  encodeJson x = genericEncodeJson x
