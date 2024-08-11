@@ -82,10 +82,12 @@ component = H.mkComponent { initialState, eval, render }
 
   handleAction = case _ of
     Start _event -> do
-      -- blocking sequencing works!
-      runInteraction $ void $ do
-        void $ inject $ ChooseTurnAction { target: PlayerId false, k: pure }
-        void $ inject $ ChooseTurnAction { target: PlayerId true, k: pure }
+      let
+        m _ = do
+          void $ inject $ ChooseTurnAction { target: PlayerId false, k: pure }
+          void $ inject $ ChooseTurnAction { target: PlayerId true, k: pure }
+          m unit
+      runInteraction $ void $ m unit
       pure unit
     WidgetOutput_Action (WidgetOutput m) -> do
       modify_ _ { mb_widget = Nothing }
