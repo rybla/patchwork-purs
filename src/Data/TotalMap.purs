@@ -1,25 +1,24 @@
 module Data.TotalMap
   ( TotalMap
-  , new
+  , fromFunction
   , at'
   ) where
 
 import Prelude
 
 import Data.Enum (class BoundedEnum, enumFromTo)
-import Data.Lens (Lens, Lens', lens')
+import Data.Lens (Lens', lens')
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (maybe')
-import Data.Newtype (over)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Partial.Unsafe (unsafeCrashWith)
 
 newtype TotalMap k v = TotalMap (Map k v)
 
-new :: forall k v. BoundedEnum k => (k -> v) -> TotalMap k v
-new f =
+fromFunction :: forall k v. BoundedEnum k => (k -> v) -> TotalMap k v
+fromFunction f =
   (enumFromTo bottom top :: Array k)
     # map (\k -> k /\ f k)
     # Map.fromFoldable

@@ -1,17 +1,16 @@
 module Patchwork.App.Simple1 where
 
-import Patchwork.Interaction
 import Prelude
 
-import Control.Bind (bindFlipped)
 import Control.Monad.Free (Free, runFreeM)
-import Control.Monad.State (modify_)
+import Control.Monad.State (StateT, execStateT, get, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array ((..))
 import Data.Array as Array
-import Data.Foldable (traverse_)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (over, wrap)
+import Data.TotalMap as TotalMap
+import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Class.Console as Console
@@ -22,8 +21,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver as HVD
-import Patchwork.Model (PlayerId(..), TurnAction(..))
-import Patchwork.Util (todo, (∘))
+import Patchwork.Interaction (ChooseTurnAction(..), ChooseWaitDuration(..), InteractionF(..), InteractionT(..), Lift(..), PlacePatch(..), SetWinner(..), inject)
+import Patchwork.Model (Model(..), Player(..), PlayerId(..), TurnAction(..))
+import Patchwork.Util (todo)
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -34,8 +34,8 @@ type Input = {}
 
 type State =
   { count :: Int
-  , activePlayer :: PlayerId
   , mb_widget :: Maybe Widget
+  , model :: Model
   }
 
 data Action
@@ -53,7 +53,8 @@ type WidgetSlot = Slot WidgetQuery WidgetOutput
 type Widget = H.Component WidgetQuery WidgetInput WidgetOutput Aff
 data WidgetQuery a = WidgetQuery a
 type WidgetInput = {}
-data WidgetOutput = WidgetOutput (Aff (Free (InteractionF Aff) Unit))
+-- data WidgetOutput = WidgetOutput (Aff (Free (InteractionF Aff) Unit))
+data WidgetOutput = WidgetOutput (StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
 
 component :: forall query. H.Component query Input Output Aff
 component = H.mkComponent { initialState, eval, render }
@@ -61,7 +62,21 @@ component = H.mkComponent { initialState, eval, render }
   initialState :: Input -> State
   initialState _ =
     { count: 0
-    , activePlayer: bottom
+    , model: Model
+        { patches: Map.empty
+        , maxTime: 0
+        , patchCircle: Map.empty
+        , currentCirclePos: wrap 0
+        , activePlayer: bottom
+        , players: TotalMap.fromFunction \_ ->
+            Player
+              { name: "Bon"
+              , buttons: 0
+              , quilt: Map.empty
+              , time: 0
+              }
+        , winner: Nothing
+        }
     , mb_widget: Nothing
     }
 
@@ -76,15 +91,16 @@ component = H.mkComponent { initialState, eval, render }
       pure unit
     WidgetOutput_Action (WidgetOutput m) -> do
       modify_ _ { mb_widget = Nothing }
-      m
-        # liftAff
-        # bindFlipped (runInteraction ∘ InteractionT)
+      { model } <- get
+      fm /\ model' <- m # flip runStateT model # liftAff
+      modify_ _ { model = model' }
+      runInteraction (InteractionT fm)
       pure unit
 
-  render { count, mb_widget, activePlayer } =
+  render { count, mb_widget, model: Model model } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 0.5em" ]
-      ( [ [ HH.div [] [ HH.text $ "activePlayer: " <> show activePlayer ] ]
+      ( [ [ HH.div [] [ HH.text $ "activePlayer: " <> show model.activePlayer ] ]
         , [ HH.button [ HE.onClick Start ] [ HH.text "Start" ] ]
         , [ HH.div [] [ HH.text $ "count: " <> show count ] ]
         , mb_widget # maybe [] \widget ->
@@ -94,31 +110,36 @@ component = H.mkComponent { initialState, eval, render }
       )
 
 runInteraction
-  :: InteractionT Aff Unit
+  :: InteractionT (StateT Model Aff) Unit
   -> HalogenM State Action Slots Output Aff Unit
-runInteraction = unwrap >>> runFreeM
-  ( case _ of
-      Lift_InteractionF (Lift ma) -> lift ma
-      ChooseTurnAction_InteractionF (ChooseTurnAction { target, k }) -> do
-        modify_ _ { activePlayer = target }
-        let
-          widget = H.mkComponent { initialState, eval, render }
-            where
-            initialState _ = {}
-            eval = H.mkEval H.defaultEval
-              { handleAction = \selection -> do
-                  Console.log $ "selection: " <> show selection
-                  H.raise (WidgetOutput $ k { selection })
-              }
-            render {} =
-              HH.div
-                [ HP.style "display: flex; flex-direction: column: gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
-                [ HH.text "this is a widget"
-                , HH.button [ HE.onClick (const Buy) ] [ HH.text "Buy" ]
-                , HH.button [ HE.onClick (const Wait) ] [ HH.text "Wait" ]
-                , HH.button [ HE.onClick (const Pass) ] [ HH.text "Pass" ]
-                ]
-        modify_ _ { mb_widget = Just widget }
-        pure (pure unit)
-      _ -> todo ""
-  )
+runInteraction (InteractionT fm) = do
+  { model } <- get
+  fm # runFreeM case _ of
+    Lift_InteractionF (Lift ma) -> do
+      model' <- execStateT ma model # lift
+      modify_ _ { model = model' }
+      pure (pure unit)
+    ChooseTurnAction_InteractionF (ChooseTurnAction { target, k }) -> do
+      modify_ \env -> env { model = env.model # over Model _ { activePlayer = target } }
+      let
+        widget = H.mkComponent { initialState, eval, render }
+          where
+          initialState _ = {}
+          eval = H.mkEval H.defaultEval
+            { handleAction = \selection -> do
+                Console.log $ "selection: " <> show selection
+                H.raise (WidgetOutput $ k { selection })
+            }
+          render {} =
+            HH.div
+              [ HP.style "display: flex; flex-direction: column: gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HH.text "this is a widget"
+              , HH.button [ HE.onClick (const Buy) ] [ HH.text "Buy" ]
+              , HH.button [ HE.onClick (const Wait) ] [ HH.text "Wait" ]
+              , HH.button [ HE.onClick (const Pass) ] [ HH.text "Pass" ]
+              ]
+      modify_ _ { mb_widget = Just widget }
+      pure (pure unit)
+    PlacePatch_InteractionF (PlacePatch {}) -> todo ""
+    ChooseWaitDuration_InteractionF (ChooseWaitDuration {}) -> todo ""
+    SetWinner_InteractionF (SetWinner {}) -> todo ""
