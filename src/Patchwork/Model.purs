@@ -2,12 +2,15 @@ module Patchwork.Model where
 
 import Prelude
 
+import Data.Enum (class BoundedEnum, class Enum)
+import Data.Generic.Rep (class Generic)
 import Data.Lens (Iso')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
+import Data.Show.Generic (genericShow)
 import Data.TotalMap (TotalMap)
 import Data.Tuple.Nested (type (/\))
 import Type.Prelude (Proxy(..))
@@ -47,6 +50,14 @@ newtype PlayerId = PlayerId Boolean
 derive instance Newtype PlayerId _
 derive newtype instance Eq PlayerId
 derive newtype instance Ord PlayerId
+derive newtype instance Enum PlayerId
+derive newtype instance Bounded PlayerId
+derive newtype instance BoundedEnum PlayerId
+
+instance Show PlayerId where
+  show = case _ of
+    PlayerId false -> "Player 1"
+    PlayerId true -> "Player 2"
 
 nextPlayerId (PlayerId b) = PlayerId (not b)
 
@@ -129,3 +140,8 @@ derive newtype instance Ord CirclePos
 --------------------------------------------------------------------------------
 
 data TurnAction = Buy | Wait | Pass
+
+derive instance Generic TurnAction _
+
+instance Show TurnAction where
+  show x = genericShow x

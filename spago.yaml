@@ -11,6 +11,7 @@ package:
     - prelude
     - profunctor-lenses
     - transformers
+    - uuid
   test:
     main: Test.Main
     dependencies: []
