@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Argonaut (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
+import Data.Bifunctor (lmap)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Iso', Lens')
@@ -14,7 +15,7 @@ import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, over)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Show.Generic (genericShow)
@@ -126,6 +127,7 @@ newtype Patch = Patch
   , quiltLayout :: QuiltLayout
   }
 
+-- implicitly, pivot is around (0, 0)
 type QuiltLayout = Set (QuiltPos /\ Boolean)
 
 _Patch = _Newtype :: Iso' Patch _
@@ -206,7 +208,16 @@ instance EncodeJson TurnAction where
 data PatchOrientation = North | South | East | West
 
 adjustQuiltLayout :: QuiltPos -> PatchOrientation -> QuiltLayout -> QuiltLayout
-adjustQuiltLayout pos ori quiltLayout = todo ""
+adjustQuiltLayout pos ori = shiftQuiltLayout pos ∘ orientQuiltLayout ori
+
+orientQuiltLayout :: PatchOrientation -> QuiltLayout -> QuiltLayout
+orientQuiltLayout North = identity
+orientQuiltLayout East = Set.map $ lmap $ over QuiltPos \(x /\ y) -> y /\ -x
+orientQuiltLayout South = Set.map $ lmap $ over QuiltPos \(x /\ y) -> x /\ -y
+orientQuiltLayout West = Set.map $ lmap $ over QuiltPos \(x /\ y) -> y /\ x
+
+shiftQuiltLayout :: QuiltPos -> QuiltLayout -> QuiltLayout
+shiftQuiltLayout (QuiltPos (dx /\ dy)) = Set.map $ lmap $ over QuiltPos \(x /\ y) -> (x + dx) /\ (y + dy)
 
 --------------------------------------------------------------------------------
 -- standardPatches

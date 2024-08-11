@@ -1,6 +1,7 @@
 module Data.TotalMap
   ( TotalMap
   , fromFunction
+  , fromFunctionWithIndex
   , fromFunctionM
   , toUnfoldable
   , at'
@@ -10,6 +11,7 @@ import Prelude
 
 import Data.Argonaut (class EncodeJson)
 import Data.Enum (class BoundedEnum, enumFromTo)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Lens (Lens', lens')
 import Data.Map (Map)
 import Data.Map as Map
@@ -37,6 +39,13 @@ fromFunction :: forall k v. BoundedEnum k => (k -> v) -> TotalMap k v
 fromFunction f =
   (enumFromTo bottom top :: Array k)
     # map (\k -> k /\ f k)
+    # Map.fromFoldable
+    # TotalMap
+
+fromFunctionWithIndex :: forall k v. BoundedEnum k => (Int -> k -> v) -> TotalMap k v
+fromFunctionWithIndex f =
+  (enumFromTo bottom top :: Array k)
+    # mapWithIndex (\i k -> k /\ f i k)
     # Map.fromFoldable
     # TotalMap
 

@@ -9,8 +9,9 @@ import Control.Monad.State (StateT, get, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
 import Data.Lens ((^.))
+import Data.Lens.Record (prop)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromMaybe', maybe, maybe')
 import Data.Newtype (wrap)
 import Data.Three as Three
 import Data.TotalMap (at')
@@ -27,8 +28,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver as HVD
+import Partial.Unsafe (unsafeCrashWith)
 import Patchwork.Logic as Logic
-import Patchwork.Util (todo)
+import Patchwork.Util (todo, (∘))
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -43,7 +45,7 @@ type State =
   }
 
 data Action
-  = Start MouseEvent
+  = Initialize
   | WidgetOutput_Action WidgetOutput
 
 type Slots =
@@ -57,7 +59,6 @@ type WidgetSlot = H.Slot WidgetQuery WidgetOutput
 type Widget = H.Component WidgetQuery WidgetInput WidgetOutput Aff
 data WidgetQuery a = WidgetQuery a
 type WidgetInput = {}
--- data WidgetOutput = WidgetOutput (Aff (Free (InteractionF Aff) Unit))
 data WidgetOutput = WidgetOutput (StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
 
 component :: forall query. H.Component query Input Output Aff
@@ -72,9 +73,9 @@ component = H.mkComponent { initialState, eval, render }
           { patches
           , circle: patches # initialCircle 0
           , activePlayer: bottom
-          , players: TotalMap.fromFunction \_ ->
+          , players: TotalMap.fromFunctionWithIndex \i _ ->
               Player
-                { name: "Bob"
+                { name: [ "Alice", "Bob" ] Array.!! i # fromMaybe' (\_ -> unsafeCrashWith "impossible")
                 , buttons: 0
                 , quilt: Map.empty
                 , time: 40
@@ -84,10 +85,10 @@ component = H.mkComponent { initialState, eval, render }
       , mb_widget: Nothing
       }
 
-  eval = H.mkEval H.defaultEval { handleAction = handleAction }
+  eval = H.mkEval H.defaultEval { initialize = Just Initialize, handleAction = handleAction }
 
   handleAction = case _ of
-    Start _event -> do
+    Initialize -> do
       -- let
       --   m _ = do
       --     void $ inject $ ChooseTurnAction { k: pure }
@@ -107,13 +108,13 @@ component = H.mkComponent { initialState, eval, render }
   render { mb_widget, model: Model model } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 0.5em" ]
-      ( [ [ HH.button [ HE.onClick Start ] [ HH.text "Start" ] ]
-        --
-        -- game state 
-        --
-        , [ HH.div [] [ HH.text $ "Player 1: " <> show (model.players ^. at' bottom) ] ]
+      ( [
+          --
+          -- game state 
+          --
+          [ HH.div [] [ HH.text $ "Player 1: " <> show (model.players ^. at' bottom) ] ]
         , [ HH.div [] [ HH.text $ "Player 2: " <> show (model.players ^. at' top) ] ]
-        , [ HH.div [] [ HH.text $ "activePlayer: " <> show model.activePlayer ] ]
+        , [ HH.div [] [ HH.text $ "activePlayer: " <> show (model.players ^. at' model.activePlayer ∘ _Player ∘ prop _name) ] ]
         , [ HH.div [] [ HH.text $ "circle: " <> show model.circle ] ]
         , [ HH.div [] [ HH.text $ "winner: " <> show model.winner ] ]
         -- , [ HH.div [] [ HH.pre [ HP.style "white-space: pre-wrap;" ] [ HH.text (show (Model model)) ] ] ]
@@ -191,10 +192,10 @@ runInteraction (InteractionT fm) = do
           render {} =
             HH.div
               [ HP.style "display: flex; flex-direction: column; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
-              [ HH.div [] [ HH.text "Choose a patch from the circle." ]
+              [ HH.div [] [ HH.text "Place the patch on your quilt." ]
               , HH.div
                   [ HP.style "display: flex; flex-direction: row; gap: 0.5em;" ]
-                  [ HH.button [ HE.onClick (const { pos: QuiltPos (0 /\ 0), ori: North }) ] [ HH.text "place" ]
+                  [ HH.button [ HE.onClick (const { pos: QuiltPos (0 /\ 0), ori: North }) ] [ HH.text "example placement" ]
                   ]
               ]
         spawnWidget (H.mkComponent { initialState, eval, render })

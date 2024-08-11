@@ -116,9 +116,9 @@ placePatch patchId = do
   playerId <- gets (view (_Model ∘ prop _activePlayer))
   Patch patch <- getPatch patchId
   { pos, ori } <- inject (PlacePatch { patchId, k: pure })
-  let QuiltLayout quiltLayout = patch.quiltLayout # adjustQuiltLayout pos ori
+  let quiltLayout = patch.quiltLayout # adjustQuiltLayout pos ori
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _quilt %=
-    Map.union (quiltLayout.content # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn)) # Map.fromFoldable)
+    Map.union (quiltLayout # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn)) # Map.fromFoldable)
 
 spendButtons
   :: forall m. MonadAff m => Int -> M m Unit
