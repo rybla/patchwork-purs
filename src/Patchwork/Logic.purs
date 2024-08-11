@@ -8,15 +8,19 @@ import Control.Monad.State (StateT, gets)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Lens (view, (%=), (.=))
-import Data.Lens.At (at)
 import Data.Lens.Record (prop)
+import Data.List (List)
+import Data.List as List
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe, maybe')
+import Data.Maybe (Maybe(..), maybe')
+import Data.Set as Set
+import Data.Three as Three
 import Data.TotalMap (at')
 import Data.TotalMap as TotalMap
 import Data.Traversable (sequence)
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
+import Data.Unfoldable (replicate)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
 import Partial.Unsafe (unsafeCrashWith)
@@ -82,14 +86,19 @@ buy
   :: forall m. MonadAff m => M m Unit
 buy = do
   Console.log "[buy]"
-  { pos } <- inject (ChoosePatchFromCircle { k: pure })
-  Patch patch <- removePatchFromPatchCircle pos
-  target <- gets (view (_Model ∘ prop _activePlayer))
-  spendButtons target patch.buttonPrice
-  spendDuration target patch.durationPrice
-  placePatch target (Patch patch)
+  { selection } <- inject (ChoosePatchFromCircle { k: pure })
+  circle <- gets (view (_Model ∘ prop _circle))
+  let
+    newCircle /\ patchId =
+      circle
+        # flip (List.foldr identity) (replicate (selection # Three.toInt) shiftCircle :: List _)
+        # removeCircleFocus
+  _Model ∘ prop _circle .= newCircle
+  Patch patch <- getPatch patchId
+  spendButtons patch.buttonPrice
+  spendDuration patch.durationPrice
+  placePatch patchId
   updateWinner
-  pure unit
 
 wait
   :: forall m. MonadAff m => M m Unit
@@ -101,33 +110,26 @@ wait = do
 
 -- | Run interaction where player places patch on their quilt.
 placePatch
-  :: forall m. MonadAff m => PlayerId -> Patch -> M m Unit
-placePatch target patch = do
+  :: forall m. MonadAff m => PatchId -> M m Unit
+placePatch patchId = do
   Console.log "[placePatch]"
-  quilt <- gets (view (_Model ∘ prop _players ∘ at' target ∘ _Player ∘ prop _quilt))
-  { quilt' } <- inject (PlacePatch { patch, quilt, k: pure })
-  _Model ∘ prop _players ∘ at' target ∘ _Player ∘ prop _quilt .= quilt'
-
-removePatchFromPatchCircle
-  :: forall m. MonadAff m => CirclePos -> M m Patch
-removePatchFromPatchCircle i = do
-  Console.log "[removePatchFromPatchCircle]"
-  patch <-
-    gets (view (_Model ∘ prop _patchCircle ∘ at i))
-      >>= maybe (pure (unsafeCrashWith "invalid CirclePos")) pure
-      >>= getPatch
-  _Model ∘ prop _patchCircle %=
-    Map.delete i
-  pure patch
+  playerId <- gets (view (_Model ∘ prop _activePlayer))
+  Patch patch <- getPatch patchId
+  { pos, ori } <- inject (PlacePatch { patchId, k: pure })
+  let QuiltLayout quiltLayout = patch.quiltLayout # adjustQuiltLayout pos ori
+  _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _quilt %=
+    Map.union (quiltLayout.content # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn)) # Map.fromFoldable)
 
 spendButtons
-  :: forall m. MonadAff m => PlayerId -> Int -> M m Unit
-spendButtons playerId buttons = do
+  :: forall m. MonadAff m => Int -> M m Unit
+spendButtons buttons = do
+  playerId <- gets (view (_Model ∘ prop _activePlayer))
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _buttons %= (_ - buttons)
 
 spendDuration
-  :: forall m. MonadAff m => PlayerId -> Int -> M m Unit
-spendDuration playerId duration = do
+  :: forall m. MonadAff m => Int -> M m Unit
+spendDuration duration = do
+  playerId <- gets (view (_Model ∘ prop _activePlayer))
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _time %= (_ - duration)
 
 getPatch
@@ -136,7 +138,7 @@ getPatch patchId = do
   patches <- gets (view (_Model ∘ prop _patches))
   patches
     # Map.lookup patchId
-    # maybe' (unsafeCrashWith $ "invalid PatchId: " <> show patchId) pure
+    # maybe' (\_ -> unsafeCrashWith $ "invalid PatchId; patchId = " <> show patchId <> "; patches.keys = " <> show (patches # Map.keys)) pure
 
 updateWinner
   :: forall m. MonadAff m => M m Unit

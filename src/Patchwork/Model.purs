@@ -6,15 +6,22 @@ import Data.Argonaut (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Iso')
+import Data.Lens (Iso', Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
+import Data.List (List(..))
+import Data.List as List
 import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Set (Set)
+import Data.Set as Set
 import Data.Show.Generic (genericShow)
 import Data.TotalMap (TotalMap)
-import Data.Tuple.Nested (type (/\))
+import Data.Tuple.Nested (type (/\), (/\))
+import Partial.Unsafe (unsafeCrashWith)
+import Patchwork.Util (todo, (∘))
 import Type.Prelude (Proxy(..))
 import Type.Proxy (Proxy)
 
@@ -24,8 +31,7 @@ import Type.Proxy (Proxy)
 
 newtype Model = Model
   { patches :: Map PatchId Patch
-  , patchCircle :: Map CirclePos PatchId
-  , currentCirclePos :: CirclePos
+  , circle :: Circle
   , players :: TotalMap PlayerId Player
   , activePlayer :: PlayerId
   , winner :: Maybe PlayerId
@@ -33,8 +39,7 @@ newtype Model = Model
 
 _Model = _Newtype :: Iso' Model _
 _patches = Proxy :: Proxy "patches"
-_patchCircle = Proxy :: Proxy "patchCircle"
-_currentCirclePos = Proxy :: Proxy "currentCirclePos"
+_circle = Proxy :: Proxy "circle"
 _players = Proxy :: Proxy "players"
 _activePlayer = Proxy :: Proxy "activePlayer"
 _maxTime = Proxy :: Proxy "maxTime"
@@ -86,19 +91,6 @@ instance EncodeJson PatchId where
   encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
--- PatchCircleIndex
---------------------------------------------------------------------------------
-
-newtype PatchCircleIndex = PatchCircleIndex Int
-
-derive instance Newtype PatchCircleIndex _
-derive instance Generic PatchCircleIndex _
-derive newtype instance Show PatchCircleIndex
-
-instance EncodeJson PatchCircleIndex where
-  encodeJson x = genericEncodeJson x
-
---------------------------------------------------------------------------------
 -- Player
 --------------------------------------------------------------------------------
 
@@ -122,7 +114,7 @@ derive newtype instance Show Player
 instance EncodeJson Player where
   encodeJson x = genericEncodeJson x
 
-type Quilt = Map QuiltPos PatchId
+type Quilt = Map QuiltPos (PatchId /\ Boolean)
 
 --------------------------------------------------------------------------------
 -- Patch
@@ -131,14 +123,15 @@ type Quilt = Map QuiltPos PatchId
 newtype Patch = Patch
   { buttonPrice :: Int
   , durationPrice :: Int
-  , layout :: Set QuiltPos
-  , buttonLayout :: Set QuiltPos
+  , quiltLayout :: QuiltLayout
   }
+
+type QuiltLayout = Set (QuiltPos /\ Boolean)
 
 _Patch = _Newtype :: Iso' Patch _
 _buttonPrice = Proxy :: Proxy "buttonPrice"
 _durationPrice = Proxy :: Proxy "durationPrice"
-_layout = Proxy :: Proxy "layout"
+_quiltLayout = Proxy :: Proxy "quiltLayout"
 _buttonLayout = Proxy :: Proxy "buttonLayout"
 
 derive instance Newtype Patch _
@@ -164,19 +157,33 @@ instance EncodeJson QuiltPos where
   encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
--- CirclePos
+-- Circle
 --------------------------------------------------------------------------------
 
-newtype CirclePos = CirclePos Int
+newtype Circle = Circle { focus :: PatchId, items :: List PatchId }
 
-derive instance Newtype CirclePos _
-derive instance Generic CirclePos _
-derive newtype instance Show CirclePos
-derive newtype instance Eq CirclePos
-derive newtype instance Ord CirclePos
+derive instance Newtype Circle _
+derive instance Generic Circle _
+derive newtype instance Show Circle
 
-instance EncodeJson CirclePos where
+instance EncodeJson Circle where
   encodeJson x = genericEncodeJson x
+
+focus :: Lens' Circle PatchId
+focus = _Newtype ∘ prop (Proxy :: Proxy "focus")
+
+-- items :: Lens' Circle (List PatchId)
+-- items = _Newtype ∘ prop (Proxy :: Proxy "items")
+
+shiftCircle :: Circle -> Circle
+shiftCircle (Circle pc) = case pc.items of
+  Nil -> Circle pc
+  Cons item items -> Circle { focus: item, items: List.snoc items pc.focus }
+
+removeCircleFocus :: Circle -> Circle /\ PatchId
+removeCircleFocus (Circle pc) = case pc.items of
+  Nil -> unsafeCrashWith "removeCircleFocus on Circle with only 1 item"
+  Cons item items -> Circle { focus: item, items } /\ pc.focus
 
 --------------------------------------------------------------------------------
 -- TurnAction
@@ -191,3 +198,42 @@ instance Show TurnAction where
 
 instance EncodeJson TurnAction where
   encodeJson x = genericEncodeJson x
+
+--------------------------------------------------------------------------------
+-- PatchOrientation
+--------------------------------------------------------------------------------
+
+data PatchOrientation = North | South | East | West
+
+adjustQuiltLayout :: QuiltPos -> PatchOrientation -> QuiltLayout -> QuiltLayout
+adjustQuiltLayout pos ori quiltLayout = todo ""
+
+--------------------------------------------------------------------------------
+-- standardPatches
+--------------------------------------------------------------------------------
+
+standardPatches :: Map PatchId Patch
+standardPatches = Map.fromFoldable
+  [ PatchId 0 /\ Patch
+      { durationPrice: 1
+      , buttonPrice: 1
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ true ]
+      }
+  , PatchId 1 /\ Patch
+      { durationPrice: 2
+      , buttonPrice: 2
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ true ]
+      }
+  , PatchId 2 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      }
+  ]
+
+initialCircle :: Int -> Map PatchId Patch -> Circle
+initialCircle _seed patches =
+  case patches # Map.keys # List.fromFoldable of
+    Nil -> unsafeCrashWith "initialCircle with no patches"
+    Cons focus_ items -> Circle { focus: focus_, items }
+

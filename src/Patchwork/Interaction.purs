@@ -11,9 +11,10 @@ import Control.Monad.Trans.Class (class MonadTrans)
 import Control.Monad.Writer.Class (class MonadTell, tell)
 import Data.Identity (Identity)
 import Data.Newtype (class Newtype)
+import Data.Three (Three(..))
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Patchwork.Model (CirclePos(..), Patch, PatchId, PlayerId, Quilt, TurnAction)
+import Patchwork.Model (Circle(..), Patch, PatchId, PatchOrientation, PlayerId, Quilt, QuiltPos(..), TurnAction)
 
 --------------------------------------------------------------------------------
 -- InteractionF
@@ -54,13 +55,13 @@ derive instance Functor m => Functor (ChooseTurnAction m)
 instance Inject ChooseTurnAction where
   inject = InteractionT <<< liftF <<< ChooseTurnAction_InteractionF
 
-newtype ChoosePatchFromCircle m (a :: Type) = ChoosePatchFromCircle { k :: { pos :: CirclePos } -> m a }
+newtype ChoosePatchFromCircle m (a :: Type) = ChoosePatchFromCircle { k :: { selection :: Three } -> m a }
 
 derive instance Functor m => Functor (ChoosePatchFromCircle m)
 instance Inject ChoosePatchFromCircle where
   inject = InteractionT <<< liftF <<< ChoosePatchFromCircle_InteractionF
 
-newtype PlacePatch m (a :: Type) = PlacePatch { patch :: Patch, quilt :: Quilt, k :: { quilt' :: Quilt } -> m a }
+newtype PlacePatch m (a :: Type) = PlacePatch { patchId :: PatchId, k :: { pos :: QuiltPos, ori :: PatchOrientation } -> m a }
 
 derive instance Functor m => Functor (PlacePatch m)
 instance Inject PlacePatch where

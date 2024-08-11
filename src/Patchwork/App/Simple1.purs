@@ -8,9 +8,12 @@ import Control.Monad.Free (Free, runFreeM)
 import Control.Monad.State (StateT, get, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
+import Data.Lens ((^.))
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (wrap)
+import Data.Three as Three
+import Data.TotalMap (at')
 import Data.TotalMap as TotalMap
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
@@ -62,22 +65,24 @@ component = H.mkComponent { initialState, eval, render }
   where
   initialState :: Input -> State
   initialState _ =
-    { model: Model
-        { patches: Map.empty
-        , patchCircle: Map.empty
-        , currentCirclePos: wrap 0
-        , activePlayer: bottom
-        , players: TotalMap.fromFunction \_ ->
-            Player
-              { name: "Bon"
-              , buttons: 0
-              , quilt: Map.empty
-              , time: 0
-              }
-        , winner: Nothing
-        }
-    , mb_widget: Nothing
-    }
+    let
+      patches = standardPatches
+    in
+      { model: Model
+          { patches
+          , circle: patches # initialCircle 0
+          , activePlayer: bottom
+          , players: TotalMap.fromFunction \_ ->
+              Player
+                { name: "Bob"
+                , buttons: 0
+                , quilt: Map.empty
+                , time: 40
+                }
+          , winner: Nothing
+          }
+      , mb_widget: Nothing
+      }
 
   eval = H.mkEval H.defaultEval { handleAction = handleAction }
 
@@ -92,7 +97,7 @@ component = H.mkComponent { initialState, eval, render }
       runInteraction $ Logic.main unit
     WidgetOutput_Action (WidgetOutput m) -> do
       modify_ _ { mb_widget = Nothing }
-      Aff.delay (wrap 100.0) # liftAff -- delay for 100ms to make it feel like things are happening, ya know
+      Aff.delay (wrap 100.0) # liftAff -- delay for 100ms to make it feel like things are happening when you click a button, ya know
       { model } <- get
       fm /\ model' <- m # flip runStateT model # H.liftAff
       modify_ _ { model = model' }
@@ -102,9 +107,19 @@ component = H.mkComponent { initialState, eval, render }
   render { mb_widget, model: Model model } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 0.5em" ]
-      ( [ [ HH.div [] [ HH.text $ "activePlayer: " <> show model.activePlayer ] ]
-        , [ HH.div [] [ HH.pre [ HP.style "white-space: pre-wrap;" ] [ HH.text (show (Model model)) ] ] ]
-        , [ HH.button [ HE.onClick Start ] [ HH.text "Start" ] ]
+      ( [ [ HH.button [ HE.onClick Start ] [ HH.text "Start" ] ]
+        --
+        -- game state 
+        --
+        , [ HH.div [] [ HH.text $ "Player 1: " <> show (model.players ^. at' bottom) ] ]
+        , [ HH.div [] [ HH.text $ "Player 2: " <> show (model.players ^. at' top) ] ]
+        , [ HH.div [] [ HH.text $ "activePlayer: " <> show model.activePlayer ] ]
+        , [ HH.div [] [ HH.text $ "circle: " <> show model.circle ] ]
+        , [ HH.div [] [ HH.text $ "winner: " <> show model.winner ] ]
+        -- , [ HH.div [] [ HH.pre [ HP.style "white-space: pre-wrap;" ] [ HH.text (show (Model model)) ] ] ]
+        --
+        -- widget
+        --
         , mb_widget # maybe [] \widget ->
             [ HH.slot (Proxy :: Proxy "widget") unit widget {} WidgetOutput_Action
             ]
@@ -123,36 +138,66 @@ runInteraction (InteractionT fm) = do
         ma' /\ model' <- runStateT ma model # lift
         modify_ _ { model = model' }
         pure ma'
-      ChooseTurnAction_InteractionF (ChooseTurnAction { k }) -> spawnWidget (H.mkComponent { initialState, eval, render })
-        where
-        initialState _ = {}
-        eval = H.mkEval H.defaultEval
-          { handleAction = \{ selection } -> do
-              Console.log $ "selection = " <> show selection
-              H.raise (WidgetOutput $ k { selection })
-          }
-        render {} =
-          HH.div
-            [ HP.style "display: flex; flex-direction: row; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
-            [ HH.text "choose turn action:"
-            , HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
-            , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
-            , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
-            ]
-      ChoosePatchFromCircle_InteractionF (ChoosePatchFromCircle { k }) -> spawnWidget (H.mkComponent { initialState, eval, render })
-        where
-        initialState _ = {}
-        eval = H.mkEval H.defaultEval
-          { handleAction = \{ pos } -> do
-              Console.log $ "pos = " <> show pos
-              H.raise (WidgetOutput $ k { pos })
-          }
-        render {} =
-          HH.div
-            [ HP.style "display: flex; flex-direction: row; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
-            [ HH.text "choose patch from circle:"
-            -- , HH.button [ HE.onClick (const ?a) ] [ HH.text "Buy" ]
-            ]
+      ChooseTurnAction_InteractionF (ChooseTurnAction { k }) -> do
+        let
+          initialState _ = {}
+          eval = H.mkEval H.defaultEval
+            { handleAction = \{ selection } -> do
+                Console.log $ "selection = " <> show selection
+                H.raise (WidgetOutput $ k { selection })
+            }
+          render {} =
+            HH.div
+              [ HP.style "display: flex; flex-direction: column; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HH.div [] [ HH.text "Choose what to do on your turn." ]
+              , HH.div
+                  [ HP.style "display: flex; flex-direction: row; gap: 0.5em;" ]
+                  [ HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
+                  , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
+                  , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
+                  ]
+              ]
+        spawnWidget (H.mkComponent { initialState, eval, render })
+      ChoosePatchFromCircle_InteractionF (ChoosePatchFromCircle { k }) -> do
+        -- { model: Model model } <- get
+        let
+          initialState _ = {}
+          eval = H.mkEval H.defaultEval
+            { handleAction = \{ selection } -> do
+                Console.log $ "selection = " <> show selection
+                H.raise (WidgetOutput $ k { selection })
+            }
+          render {} =
+            HH.div
+              [ HP.style "display: flex; flex-direction: column; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HH.div [] [ HH.text "Choose a patch from the circle." ]
+              , HH.div
+                  [ HP.style "display: flex; flex-direction: row; gap: 0.5em;" ]
+                  [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
+                  , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
+                  , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
+                  ]
+              ]
+        spawnWidget (H.mkComponent { initialState, eval, render })
+      PlacePatch_InteractionF (PlacePatch { patchId, k }) -> do
+        -- { model: Model model } <- get
+        let
+          initialState _ = {}
+          eval = H.mkEval H.defaultEval
+            { handleAction = \{ pos, ori } -> do
+                -- Console.log $ " = " <> show 
+                H.raise (WidgetOutput $ k { pos, ori })
+            }
+          render {} =
+            HH.div
+              [ HP.style "display: flex; flex-direction: column; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HH.div [] [ HH.text "Choose a patch from the circle." ]
+              , HH.div
+                  [ HP.style "display: flex; flex-direction: row; gap: 0.5em;" ]
+                  [ HH.button [ HE.onClick (const { pos: QuiltPos (0 /\ 0), ori: North }) ] [ HH.text "place" ]
+                  ]
+              ]
+        spawnWidget (H.mkComponent { initialState, eval, render })
       _ -> todo "interpretation"
 
 spawnWidget :: Widget -> H.HalogenM State Action Slots Output Aff (Free (InteractionF (StateT Model Aff)) Unit)
