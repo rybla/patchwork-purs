@@ -29,7 +29,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver as HVD
 import Partial.Unsafe (unsafeCrashWith)
-import Patchwork.App.Common (renderPatch)
+import Patchwork.App.Common (renderPatch, renderPlayer)
 import Patchwork.Logic as Logic
 import Patchwork.Util (todo, (∘))
 import Type.Proxy (Proxy(..))
@@ -77,7 +77,7 @@ component = H.mkComponent { initialState, eval, render }
           , players: TotalMap.fromFunctionWithIndex \i _ ->
               Player
                 { name: [ "Alice", "Bob" ] Array.!! i # fromMaybe' (\_ -> unsafeCrashWith "impossible")
-                , buttons: 0
+                , buttons: 5
                 , quilt: Map.empty
                 , time: 40
                 }
@@ -113,9 +113,13 @@ component = H.mkComponent { initialState, eval, render }
           --
           -- game state 
           --
-          [ HH.div [] [ HH.text $ "Player 1: " <> show (model.players ^. at' bottom) ] ]
-        , [ HH.div [] [ HH.text $ "Player 2: " <> show (model.players ^. at' top) ] ]
-        , [ HH.div [] [ HH.text $ "activePlayer: " <> show (model.players ^. at' model.activePlayer ∘ _Player ∘ prop _name) ] ]
+          [ HH.div [] [ HH.text $ "activePlayer: " <> show (model.players ^. at' model.activePlayer ∘ _Player ∘ prop _name) ] ]
+        , [ HH.div
+              [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+              [ renderPlayer model.patches (model.players ^. at' bottom)
+              , renderPlayer model.patches (model.players ^. at' top)
+              ]
+          ]
         , case model.winner of
             Nothing -> []
             Just winner -> [ HH.div [] [ HH.text $ "winner: " <> show winner ] ]
@@ -123,7 +127,7 @@ component = H.mkComponent { initialState, eval, render }
         -- circle
         --
         , [ HH.div
-              [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+              [ HP.style "display: flex; flex-direction: row; gap: 1.0em; flex-wrap: wrap;" ]
               let
                 Circle { focus, items } = model.circle
                 renderPatchId patchId =

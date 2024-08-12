@@ -21,6 +21,8 @@ import Data.Set as Set
 import Data.Show.Generic (genericShow)
 import Data.TotalMap (TotalMap)
 import Data.Tuple.Nested (type (/\), (/\))
+import Halogen.Svg.Attributes (Color)
+import Halogen.Svg.Attributes as HSvgA
 import Partial.Unsafe (unsafeCrashWith)
 import Patchwork.Util (todo, (∘))
 import Type.Prelude (Proxy(..))
@@ -49,8 +51,6 @@ _winner = Proxy :: Proxy "winner"
 derive instance Newtype Model _
 derive instance Generic Model _
 derive newtype instance Show Model
-instance EncodeJson Model where
-  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- PlayerId
@@ -71,9 +71,6 @@ instance Show PlayerId where
     PlayerId false -> "Player 1"
     PlayerId true -> "Player 2"
 
-instance EncodeJson PlayerId where
-  encodeJson x = genericEncodeJson x
-
 nextPlayerId (PlayerId b) = PlayerId (not b)
 
 --------------------------------------------------------------------------------
@@ -88,9 +85,6 @@ derive newtype instance Show PatchId
 derive newtype instance Eq PatchId
 derive newtype instance Ord PatchId
 
-instance EncodeJson PatchId where
-  encodeJson x = genericEncodeJson x
-
 --------------------------------------------------------------------------------
 -- Player
 --------------------------------------------------------------------------------
@@ -98,8 +92,8 @@ instance EncodeJson PatchId where
 newtype Player = Player
   { name :: String
   , time :: Int
-  , quilt :: Quilt
   , buttons :: Int
+  , quilt :: Quilt
   }
 
 _Player = _Newtype :: Iso' Player _
@@ -112,9 +106,6 @@ derive instance Newtype Player _
 derive instance Generic Player _
 derive newtype instance Show Player
 
-instance EncodeJson Player where
-  encodeJson x = genericEncodeJson x
-
 type Quilt = Map QuiltPos (PatchId /\ Boolean)
 
 --------------------------------------------------------------------------------
@@ -125,6 +116,7 @@ newtype Patch = Patch
   { buttonPrice :: Int
   , durationPrice :: Int
   , quiltLayout :: QuiltLayout
+  , patchStyle :: PatchStyle
   }
 
 -- implicitly, pivot is around (0, 0)
@@ -140,8 +132,18 @@ derive instance Newtype Patch _
 derive instance Generic Patch _
 derive newtype instance Show Patch
 
-instance EncodeJson Patch where
-  encodeJson x = genericEncodeJson x
+--------------------------------------------------------------------------------
+-- PatchStyle
+--------------------------------------------------------------------------------
+
+data PatchStyle 
+  = SolidColorPatchStyle Color
+  | BackgroundPatchStyle
+
+derive instance Generic PatchStyle _
+
+instance Show PatchStyle where
+  show x = genericShow x
 
 --------------------------------------------------------------------------------
 -- QuiltPos
@@ -155,9 +157,6 @@ derive newtype instance Show QuiltPos
 derive newtype instance Eq QuiltPos
 derive newtype instance Ord QuiltPos
 
-instance EncodeJson QuiltPos where
-  encodeJson x = genericEncodeJson x
-
 --------------------------------------------------------------------------------
 -- Circle
 --------------------------------------------------------------------------------
@@ -167,9 +166,6 @@ newtype Circle = Circle { focus :: PatchId, items :: List PatchId }
 derive instance Newtype Circle _
 derive instance Generic Circle _
 derive newtype instance Show Circle
-
-instance EncodeJson Circle where
-  encodeJson x = genericEncodeJson x
 
 focus :: Lens' Circle PatchId
 focus = _Newtype ∘ prop (Proxy :: Proxy "focus")
@@ -197,9 +193,6 @@ derive instance Generic TurnAction _
 
 instance Show TurnAction where
   show x = genericShow x
-
-instance EncodeJson TurnAction where
-  encodeJson x = genericEncodeJson x
 
 --------------------------------------------------------------------------------
 -- PatchOrientation
@@ -229,16 +222,97 @@ standardPatches = Map.fromFoldable
       { durationPrice: 1
       , buttonPrice: 1
       , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 255 100 100)
       }
   , PatchId 1 /\ Patch
       { durationPrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , PatchId 2 /\ Patch
       { durationPrice: 3
       , buttonPrice: 3
       , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 3 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 4 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 5 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 6 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 7 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 8 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 9 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 10 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 11 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 12 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 13 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 14 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
+      }
+  , PatchId 15 /\ Patch
+      { durationPrice: 3
+      , buttonPrice: 3
+      , quiltLayout: Set.fromFoldable [ QuiltPos (0 /\ 0) /\ false, QuiltPos (0 /\ 1) /\ false, QuiltPos (0 /\ 2) /\ true ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 100 255)
       }
   ]
 
