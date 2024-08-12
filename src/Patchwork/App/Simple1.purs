@@ -8,11 +8,14 @@ import Control.Monad.Free (Free, runFreeM)
 import Control.Monad.State (StateT, get, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
-import Data.Lens ((^.))
+import Data.Lens ((%=), (^.))
+import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe', maybe, maybe')
+import Data.Maybe (Maybe(..), fromMaybe', maybe)
 import Data.Newtype (wrap)
+import Data.Set as Set
 import Data.Three as Three
 import Data.TotalMap (at')
 import Data.TotalMap as TotalMap
@@ -21,19 +24,25 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Class.Console as Console
-import Halogen (liftAff)
+import Halogen (liftAff, liftEffect)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.Event as HQE
 import Halogen.VDom.Driver as HVD
 import Partial.Unsafe (unsafeCrashWith)
-import Patchwork.App.Common (renderPatch, renderPlayer)
+import Patchwork.App.Common (renderPatch, renderPlayer, renderQuilt)
 import Patchwork.Logic as Logic
-import Patchwork.Util (todo, (∘))
+import Patchwork.Util (bug, todo, (∘))
 import Type.Proxy (Proxy(..))
-import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.HTML as Web
+import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.Window as Window
+import Web.UIEvent.KeyboardEvent (KeyboardEvent)
+import Web.UIEvent.KeyboardEvent as KE
+import Web.UIEvent.KeyboardEvent.EventTypes as KET
 
 main :: Effect Unit
 main = HA.runHalogenAff (HVD.runUI component {} =<< HA.awaitBody)
@@ -48,6 +57,7 @@ type State =
 data Action
   = Initialize
   | WidgetOutput_Action WidgetOutput
+  | Keyboard_Action KeyboardEvent
 
 type Slots =
   ( widget :: WidgetSlot Unit
@@ -58,8 +68,13 @@ type Output = Void
 type WidgetSlot = H.Slot WidgetQuery WidgetOutput
 
 type Widget = H.Component WidgetQuery WidgetInput WidgetOutput Aff
-data WidgetQuery a = WidgetQuery a
+
+data WidgetQuery a
+  = Pure_WidgetQuery a
+  | Keyboard_WidgetQuery KeyboardEvent a
+
 type WidgetInput = {}
+
 data WidgetOutput = WidgetOutput (StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
 
 component :: forall query. H.Component query Input Output Aff
@@ -96,6 +111,14 @@ component = H.mkComponent { initialState, eval, render }
       --     void $ inject $ ChooseTurnAction { k: pure }
       --     m unit
       -- runInteraction $ void $ m unit
+
+      document <- Web.window >>= Window.document # liftEffect
+      H.subscribe' \_ ->
+        HQE.eventListener
+          KET.keyup
+          (HTMLDocument.toEventTarget document)
+          (map Keyboard_Action <<< KE.fromEvent)
+
       runInteraction $ Logic.main unit
     WidgetOutput_Action (WidgetOutput m) -> do
       modify_ _ { mb_widget = Nothing }
@@ -105,27 +128,27 @@ component = H.mkComponent { initialState, eval, render }
       modify_ _ { model = model' }
       runInteraction (InteractionT fm)
       pure unit
+    Keyboard_Action ke -> H.tell (Proxy :: Proxy "widget") unit $ Keyboard_WidgetQuery ke
 
   render { mb_widget, model: Model model } =
     HH.div
       [ HP.style "padding: 1em; display: flex; flex-direction: column; gap: 1.0em;" ]
-      ( [
-          --
-          -- game state 
-          --
-          [ HH.div [] [ HH.text $ "activePlayer: " <> show (model.players ^. at' model.activePlayer ∘ _Player ∘ prop _name) ] ]
+      ( [ [ HH.div [] [ HH.text $ "activePlayer: " <> show (model.players ^. at' model.activePlayer ∘ _Player ∘ prop _name) ] ]
+        , [ HH.div
+              [ HP.style "min-height: 6em;" ]
+              ( mb_widget # maybe
+                  []
+                  \widget ->
+                    [ HH.slot (Proxy :: Proxy "widget") unit widget {} WidgetOutput_Action
+                    ]
+              )
+          ]
         , [ HH.div
               [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
               [ renderPlayer model.patches (model.players ^. at' bottom)
               , renderPlayer model.patches (model.players ^. at' top)
               ]
           ]
-        , case model.winner of
-            Nothing -> []
-            Just winner -> [ HH.div [] [ HH.text $ "winner: " <> show winner ] ]
-        --
-        -- circle
-        --
         , [ HH.div
               [ HP.style "display: flex; flex-direction: row; gap: 1.0em; flex-wrap: wrap;" ]
               let
@@ -145,12 +168,9 @@ component = H.mkComponent { initialState, eval, render }
                 ]
                   # Array.fold
           ]
-        --
-        -- widget
-        --
-        , mb_widget # maybe [] \widget ->
-            [ HH.slot (Proxy :: Proxy "widget") unit widget {} WidgetOutput_Action
-            ]
+        , case model.winner of
+            Nothing -> []
+            Just winner -> [ HH.div [] [ HH.text $ "winner: " <> show winner ] ]
         ] # Array.fold
       )
 
@@ -192,7 +212,6 @@ runInteraction (InteractionT fm) = do
           initialState _ = {}
           eval = H.mkEval H.defaultEval
             { handleAction = \{ selection } -> do
-                Console.log $ "selection = " <> show selection
                 H.raise (WidgetOutput $ k { selection })
             }
           render {} =
@@ -208,27 +227,69 @@ runInteraction (InteractionT fm) = do
               ]
         spawnWidget (H.mkComponent { initialState, eval, render })
       PlacePatch_InteractionF (PlacePatch { patchId, k }) -> do
-        -- { model: Model model } <- get
-        let
-          initialState _ = {}
-          eval = H.mkEval H.defaultEval
-            { handleAction = \{ pos, ori } -> do
-                -- Console.log $ " = " <> show 
-                H.raise (WidgetOutput $ k { pos, ori })
-            }
-          render {} =
-            HH.div
-              [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
-              [ HH.div [] [ HH.text "Place the patch on your quilt." ]
-              , HH.div
-                  [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
-                  [ HH.button [ HE.onClick (const { pos: QuiltPos (0 /\ 0), ori: North }) ] [ HH.text "example placement" ]
-                  ]
-              ]
-        spawnWidget (H.mkComponent { initialState, eval, render })
+        { model } <- get
+        spawnWidget (placePatchWidget model patchId k)
       _ -> todo "interpretation"
 
 spawnWidget :: Widget -> H.HalogenM State Action Slots Output Aff (Free (InteractionF (StateT Model Aff)) Unit)
 spawnWidget widget = do
   modify_ _ { mb_widget = Just widget }
   pure (pure unit)
+
+placePatchWidget
+  :: Model
+  -> PatchId
+  -> ( { ori :: PatchOrientation
+       , pos :: QuiltPos
+       }
+       -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit)
+     )
+  -> Widget
+placePatchWidget (Model model) patchId k = H.mkComponent { initialState, eval, render }
+  where
+  Patch patch = model.patches # Map.lookup patchId # fromMaybe' \_ -> bug "invalid PatchId"
+
+  initialState _ =
+    { quilt: model.players ^. at' model.activePlayer ∘ _Player ∘ prop _quilt
+    , pos: QuiltPos (0 /\ 0)
+    , ori: North
+    }
+
+  eval = H.mkEval H.defaultEval
+    { handleQuery = case _ of
+        Pure_WidgetQuery a -> pure (Just a)
+        Keyboard_WidgetQuery ke a -> do
+          case KE.key ke of
+            "ArrowLeft" | KE.shiftKey ke -> prop (Proxy :: Proxy "ori") %= nextPatchOrientation
+            "ArrowRight" | KE.shiftKey ke -> prop (Proxy :: Proxy "ori") %= prevPatchOrientation
+            "ArrowUp" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> (x /\ (y - 1))
+            "ArrowDown" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> (x /\ (y + 1))
+            "ArrowLeft" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> ((x - 1) /\ y)
+            "ArrowRight" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> ((x + 1) /\ y)
+            _ -> pure unit
+          pure (Just a)
+    , handleAction = \{ pos, ori } -> do
+        H.raise (WidgetOutput $ k { pos, ori })
+    }
+
+  render { quilt, pos, ori } =
+    HH.div
+      [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
+      [ HH.div [] [ HH.text "Place the patch on your quilt." ]
+      , HH.div []
+          [ renderQuilt model.patches
+              ( quilt # Map.union
+                  ( patch.quiltLayout
+                      # adjustQuiltLayout pos ori
+                      # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn))
+                      # Map.fromFoldable
+                  )
+              )
+          ]
+      , HH.div []
+          [ HH.button
+              [ HE.onClick (const { ori, pos }) ]
+              [ HH.text "Submit" ]
+          ]
+
+      ]

@@ -136,7 +136,7 @@ derive newtype instance Show Patch
 -- PatchStyle
 --------------------------------------------------------------------------------
 
-data PatchStyle 
+data PatchStyle
   = SolidColorPatchStyle Color
   | BackgroundPatchStyle
 
@@ -156,6 +156,9 @@ derive instance Generic QuiltPos _
 derive newtype instance Show QuiltPos
 derive newtype instance Eq QuiltPos
 derive newtype instance Ord QuiltPos
+
+addQuiltPos :: QuiltPos -> QuiltPos -> QuiltPos
+addQuiltPos (QuiltPos (x1 /\ y1)) (QuiltPos (x2 /\ y2)) = QuiltPos ((x1 + x2) /\ (y1 + y2))
 
 --------------------------------------------------------------------------------
 -- Circle
@@ -200,14 +203,30 @@ instance Show TurnAction where
 
 data PatchOrientation = North | South | East | West
 
+nextPatchOrientation :: PatchOrientation -> PatchOrientation
+nextPatchOrientation North = East
+nextPatchOrientation East = South
+nextPatchOrientation South = West
+nextPatchOrientation West = North
+
+prevPatchOrientation :: PatchOrientation -> PatchOrientation
+prevPatchOrientation East = North
+prevPatchOrientation South = East
+prevPatchOrientation West = South
+prevPatchOrientation North = West
+
+--------------------------------------------------------------------------------
+-- adjustQuiltLayout
+--------------------------------------------------------------------------------
+
 adjustQuiltLayout :: QuiltPos -> PatchOrientation -> QuiltLayout -> QuiltLayout
 adjustQuiltLayout pos ori = shiftQuiltLayout pos ∘ orientQuiltLayout ori
 
 orientQuiltLayout :: PatchOrientation -> QuiltLayout -> QuiltLayout
 orientQuiltLayout North = identity
 orientQuiltLayout East = Set.map $ lmap $ over QuiltPos \(x /\ y) -> y /\ -x
-orientQuiltLayout South = Set.map $ lmap $ over QuiltPos \(x /\ y) -> x /\ -y
-orientQuiltLayout West = Set.map $ lmap $ over QuiltPos \(x /\ y) -> y /\ x
+orientQuiltLayout West = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -y /\ x
+orientQuiltLayout South = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -x /\ -y
 
 shiftQuiltLayout :: QuiltPos -> QuiltLayout -> QuiltLayout
 shiftQuiltLayout (QuiltPos (dx /\ dy)) = Set.map $ lmap $ over QuiltPos \(x /\ y) -> (x + dx) /\ (y + dy)
