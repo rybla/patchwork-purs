@@ -11,6 +11,7 @@ workspace:
         - effect
         - free
         - halogen
+        - halogen-svg-elems
         - lists
         - prelude
         - profunctor-lenses
@@ -53,6 +54,7 @@ workspace:
         - gen
         - halogen
         - halogen-subscriptions
+        - halogen-svg-elems
         - halogen-vdom
         - identity
         - integers
@@ -1030,6 +1032,12 @@ packages:
       - refs
       - safe-coerce
       - unsafe-reference
+  halogen-svg-elems:
+    type: registry
+    version: 8.0.0
+    integrity: sha256-NtZ30NoNyadVEsRcdY0zvm2yyahxUTgpioDNVz5gEIA=
+    dependencies:
+      - halogen
   halogen-vdom:
     type: registry
     version: 8.0.0

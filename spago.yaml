@@ -9,6 +9,7 @@ package:
     - effect
     - free
     - halogen
+    - halogen-svg-elems
     - lists
     - prelude
     - profunctor-lenses

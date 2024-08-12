@@ -29,6 +29,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver as HVD
 import Partial.Unsafe (unsafeCrashWith)
+import Patchwork.App.Common (renderPatch)
 import Patchwork.Logic as Logic
 import Patchwork.Util (todo, (∘))
 import Type.Proxy (Proxy(..))
@@ -107,7 +108,7 @@ component = H.mkComponent { initialState, eval, render }
 
   render { mb_widget, model: Model model } =
     HH.div
-      [ HP.style "display: flex; flex-direction: column; gap: 0.5em" ]
+      [ HP.style "padding: 1em; display: flex; flex-direction: column; gap: 1.0em;" ]
       ( [
           --
           -- game state 
@@ -115,9 +116,31 @@ component = H.mkComponent { initialState, eval, render }
           [ HH.div [] [ HH.text $ "Player 1: " <> show (model.players ^. at' bottom) ] ]
         , [ HH.div [] [ HH.text $ "Player 2: " <> show (model.players ^. at' top) ] ]
         , [ HH.div [] [ HH.text $ "activePlayer: " <> show (model.players ^. at' model.activePlayer ∘ _Player ∘ prop _name) ] ]
-        , [ HH.div [] [ HH.text $ "circle: " <> show model.circle ] ]
-        , [ HH.div [] [ HH.text $ "winner: " <> show model.winner ] ]
-        -- , [ HH.div [] [ HH.pre [ HP.style "white-space: pre-wrap;" ] [ HH.text (show (Model model)) ] ] ]
+        , case model.winner of
+            Nothing -> []
+            Just winner -> [ HH.div [] [ HH.text $ "winner: " <> show winner ] ]
+        --
+        -- circle
+        --
+        , [ HH.div
+              [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+              let
+                Circle { focus, items } = model.circle
+                renderPatchId patchId =
+                  let
+                    patch = model.patches # Map.lookup patchId # fromMaybe' (\_ -> unsafeCrashWith "impossible: invalid patchId")
+                  in
+                    HH.div
+                      [ HP.style "border: 0.1em solid black; padding: 1.0em;" ]
+                      [ renderPatch patch ]
+              in
+                [ items
+                    # map renderPatchId
+                    # Array.fromFoldable
+                , [ renderPatchId focus ]
+                ]
+                  # Array.fold
+          ]
         --
         -- widget
         --
@@ -149,10 +172,10 @@ runInteraction (InteractionT fm) = do
             }
           render {} =
             HH.div
-              [ HP.style "display: flex; flex-direction: column; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
               [ HH.div [] [ HH.text "Choose what to do on your turn." ]
               , HH.div
-                  [ HP.style "display: flex; flex-direction: row; gap: 0.5em;" ]
+                  [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
                   [ HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
                   , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
                   , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
@@ -170,10 +193,10 @@ runInteraction (InteractionT fm) = do
             }
           render {} =
             HH.div
-              [ HP.style "display: flex; flex-direction: column; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
               [ HH.div [] [ HH.text "Choose a patch from the circle." ]
               , HH.div
-                  [ HP.style "display: flex; flex-direction: row; gap: 0.5em;" ]
+                  [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
                   [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
                   , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
                   , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
@@ -191,10 +214,10 @@ runInteraction (InteractionT fm) = do
             }
           render {} =
             HH.div
-              [ HP.style "display: flex; flex-direction: column; gap: 0.5em; border: 0.1em solid black; padding: 0.5em;" ]
+              [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
               [ HH.div [] [ HH.text "Place the patch on your quilt." ]
               , HH.div
-                  [ HP.style "display: flex; flex-direction: row; gap: 0.5em;" ]
+                  [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
                   [ HH.button [ HE.onClick (const { pos: QuiltPos (0 /\ 0), ori: North }) ] [ HH.text "example placement" ]
                   ]
               ]
