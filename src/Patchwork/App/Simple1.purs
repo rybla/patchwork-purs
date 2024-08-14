@@ -245,9 +245,6 @@ widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState,
               modify_ _ { mb_err = Just "You don't have any more time to wait!" }
             else
               H.raise (WidgetOutput $ k { selection })
-          Pass ->
-            -- can ALWAYS pass
-            H.raise (WidgetOutput $ k { selection })
     }
   render { mb_err } =
     HH.div
@@ -257,7 +254,6 @@ widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState,
               [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
               [ HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
               , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
-              , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
               ]
           ]
         , mb_err # maybe [] \err ->

@@ -4,7 +4,7 @@ import Patchwork.Interaction
 import Patchwork.Model
 import Prelude
 
-import Control.Monad.State (StateT, gets)
+import Control.Monad.State (StateT, get, gets)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Lens (view, (%=), (.=))
@@ -12,19 +12,19 @@ import Data.Lens.Record (prop)
 import Data.List (List)
 import Data.List as List
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe')
+import Data.Maybe (Maybe(..), fromMaybe', maybe')
 import Data.Set as Set
 import Data.Three as Three
 import Data.TotalMap (at')
 import Data.TotalMap as TotalMap
 import Data.Traversable (sequence)
-import Data.Tuple (fst)
+import Data.Tuple (fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (replicate)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
 import Partial.Unsafe (unsafeCrashWith)
-import Patchwork.Util (todo, (∘))
+import Patchwork.Util (bug, todo, (∘))
 import Type.Prelude (Proxy(..))
 
 --------------------------------------------------------------------------------
@@ -42,45 +42,57 @@ _model = Proxy :: Proxy "model"
 main :: forall m. MonadAff m => Unit -> M m Unit
 main _ = do
   Console.log "[main]"
-  -- check if there is a winner
-  gets (view (_Model ∘ prop _winner)) >>= case _ of
-    Nothing -> do
-      Console.log "[main] no winner"
+  _Model ∘ prop _turn %= (_ + 1)
+  updateActivePlayer >>= case _ of
+    false -> do
+      -- no next active player, since game is over, and there is a winner
+      winner <- gets (view (_Model ∘ prop _winner))
+      Console.log ("[main] winer = " <> show winner)
+    true -> do
       turn <- gets (view (_Model ∘ prop _turn))
-      -- no winner, so active player takes action
       inject (ChooseTurnAction { k: pure }) >>= case _ of
         { selection: Buy } -> buy
         { selection: Wait } -> wait
-        { selection: Pass } -> pure unit
       activePlayer ∘ _Player ∘ prop _lastTurnPlayed .= turn
-      updateActivePlayer
-      _Model ∘ prop _turn %= (_ + 1)
       main unit
-    Just _playerId -> do
-      Console.log "[main] yes winner"
-      -- yes winner, so game is over
-      todo "how to indicate winner?"
-  winner <- gets (view (_Model ∘ prop _winner))
-  Console.log ("[main] winer = " <> show winner)
+
+-- -- check if there is a winner
+-- gets (view (_Model ∘ prop _winner)) >>= case _ of
+--   Nothing -> do
+--     Console.log "[main] no winner"
+
+--   Just _playerId -> do
+--     Console.log "[main] yes winner"
+--     -- yes winner, so game is over
+--     todo "how to indicate winner?"
+-- winner <- gets (view (_Model ∘ prop _winner))
+-- Console.log ("[main] winer = " <> show winner)
 
 -- | Set model.activePlayer to be the player with the most time, tie broken by
--- | last turn played.
+-- | last turn played, and return true. But, if that player cannot play, then
+-- | activePlayer to be the other player and return true. If neither player
+-- | cannot play, then game is over, and return false.
 updateActivePlayer
-  :: forall m. MonadAff m => M m Unit
+  :: forall m. MonadAff m => M m Boolean
 updateActivePlayer = do
   Console.log "[updateActivePlayer]"
-  playersTimes <- TotalMap.fromFunctionM \playerId -> do
+  playerRanks <- TotalMap.fromFunctionM \playerId -> do
     player <- gets (view (_Model ∘ prop _players ∘ at' playerId ∘ _Player))
     pure (player.time /\ player.lastTurnPlayed)
   let
     activePlayer =
-      playersTimes
+      playerRanks
         # TotalMap.toUnfoldable
         # Array.sortBy (\(_ /\ time1) (_ /\ time2) -> compare time1 time2)
         # Array.last
         # maybe' (\_ -> unsafeCrashWith "impossible: 0 players") identity
         # fst
   _Model ∘ prop _activePlayer .= activePlayer
+  -- TODO: 
+  --  - check if this player can actually play
+  --  - if not, then try other player
+  --  - if not, then game over: updateWinner, return false
+  pure true
 
 --------------------------------------------------------------------------------
 -- Functions
@@ -103,7 +115,6 @@ buy = do
   spendButtons patch.buttonPrice
   spendDuration patch.durationPrice
   placePatch patchId
-  updateWinner
 
 wait
   :: forall m. MonadAff m => M m Unit
@@ -139,31 +150,16 @@ spendDuration duration = do
   playerId <- gets (view (_Model ∘ prop _activePlayer))
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _time %= (_ - duration)
 
--- getPatch
---   :: forall m. MonadAff m => PatchId -> M m Patch
--- getPatch patchId = do
---   patches <- gets (view (_Model ∘ prop _patches))
---   patches
---     # Map.lookup patchId
---     # maybe' (\_ -> unsafeCrashWith $ "invalid PatchId; patchId = " <> show patchId <> "; patches.keys = " <> show (patches # Map.keys)) pure
-
 updateWinner
   :: forall m. MonadAff m => M m Unit
 updateWinner = do
-  players <- TotalMap.fromFunctionM \playerId -> do
-    player <- gets (view (_Model ∘ prop _players ∘ at' playerId ∘ _Player))
-    if player.time == 0 then
-      pure (Right player.buttons)
-    else
-      pure (Left unit)
-  case players # sequence of
-    Left _ -> pure unit
-    Right results ->
-      let
-        winningPlayerId /\ _ = TotalMap.toUnfoldable results
-          # Array.sortBy (\(_ /\ buttons1) (_ /\ buttons2) -> compare buttons1 buttons2)
-          # Array.head
-          # maybe' (\_ -> unsafeCrashWith "impossible: 0 players") identity
-      in
-        _Model ∘ prop _winner .= Just winningPlayerId
-
+  model <- get
+  let
+    scores = TotalMap.fromFunction \playerId ->
+      playerId # playerScore model
+  let
+    winnerId = scores # TotalMap.toUnfoldable # Array.sortBy (\(_ /\ score1) (_ /\ score2) -> score1 `compare` score2)
+      # Array.last
+      # fromMaybe' (\_ -> bug "impossible: 0 players")
+      # fst
+  _Model ∘ prop _winner .= Just winnerId

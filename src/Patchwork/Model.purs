@@ -261,7 +261,7 @@ removeCircleFocus (Circle pc) = case pc.items of
 -- TurnAction
 --------------------------------------------------------------------------------
 
-data TurnAction = Buy | Wait | Pass
+data TurnAction = Buy | Wait
 
 derive instance Generic TurnAction _
 
