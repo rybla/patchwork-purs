@@ -7,24 +7,24 @@ import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Bifunctor (lmap)
 import Data.Enum (class BoundedEnum, class Enum)
 import Data.Generic.Rep (class Generic)
-import Data.Lens (Iso', Lens')
+import Data.Lens (Iso', Lens', lens', set, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..))
+import Data.List (List(..), (:))
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe, fromMaybe')
 import Data.Newtype (class Newtype, over)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Show.Generic (genericShow)
-import Data.TotalMap (TotalMap)
+import Data.TotalMap (TotalMap, at')
 import Data.Tuple.Nested (type (/\), (/\))
 import Halogen.Svg.Attributes (Color)
 import Halogen.Svg.Attributes as HSvgA
 import Partial.Unsafe (unsafeCrashWith)
-import Patchwork.Util (todo, (∘))
+import Patchwork.Util (bug, todo, (∘))
 import Type.Prelude (Proxy(..))
 import Type.Proxy (Proxy)
 
@@ -51,6 +51,19 @@ _winner = Proxy :: Proxy "winner"
 derive instance Newtype Model _
 derive instance Generic Model _
 derive newtype instance Show Model
+
+activePlayer :: Lens' Model Player
+activePlayer = lens' \(Model model) ->
+  model.players ^. at' model.activePlayer /\
+    \player -> Model model { players = model.players # set (at' model.activePlayer) player }
+
+getActivePlayer :: Model -> Player
+getActivePlayer (Model model) = model.players ^. at' model.activePlayer
+
+getPatch :: PatchId -> Model -> Patch
+getPatch pId (Model model) = model.patches
+  # Map.lookup pId
+  # fromMaybe' \_ -> bug $ "invalid PatchId: " <> show pId
 
 --------------------------------------------------------------------------------
 -- PlayerId
@@ -172,6 +185,11 @@ derive newtype instance Show Circle
 
 focus :: Lens' Circle PatchId
 focus = _Newtype ∘ prop (Proxy :: Proxy "focus")
+
+nextThreeItemsOfCircle :: Circle -> PatchId /\ PatchId /\ PatchId
+nextThreeItemsOfCircle (Circle circle) = case circle.items # List.take 3 of
+  a : b : c : _ -> a /\ b /\ c
+  _ -> bug "the Circle cannot have less than 3 next patches"
 
 -- items :: Lens' Circle (List PatchId)
 -- items = _Newtype ∘ prop (Proxy :: Proxy "items")

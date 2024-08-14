@@ -8,6 +8,7 @@ import Control.Monad.Free (Free, runFreeM)
 import Control.Monad.State (StateT, get, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
+import Data.Foldable (any)
 import Data.Lens ((%=), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -105,20 +106,14 @@ component = H.mkComponent { initialState, eval, render }
 
   handleAction = case _ of
     Initialize -> do
-      -- let
-      --   m _ = do
-      --     void $ inject $ ChooseTurnAction { k: pure }
-      --     void $ inject $ ChooseTurnAction { k: pure }
-      --     m unit
-      -- runInteraction $ void $ m unit
-
+      -- registry event listener for keyboard
       document <- Web.window >>= Window.document # liftEffect
       H.subscribe' \_ ->
         HQE.eventListener
           KET.keyup
           (HTMLDocument.toEventTarget document)
           (map Keyboard_Action <<< KE.fromEvent)
-
+      -- start main game logic
       runInteraction $ Logic.main unit
     WidgetOutput_Action (WidgetOutput m) -> do
       modify_ _ { mb_widget = Nothing }
@@ -135,7 +130,7 @@ component = H.mkComponent { initialState, eval, render }
   render { mb_widget, model: Model model } =
     HH.div
       [ HP.style "padding: 1em; display: flex; flex-direction: column; gap: 1.0em;" ]
-      ( [ [ HH.div [] [ HH.text $ "activePlayer: " <> show (model.players ^. at' model.activePlayer ∘ _Player ∘ prop _name) ] ]
+      ( [ [ HH.div [] [ HH.text $ "activePlayer: " <> show (Model model ^. activePlayer ∘ _Player ∘ prop _name) ] ]
         , [ HH.div
               [ HP.style "min-height: 6em;" ]
               ( mb_widget # maybe
@@ -189,50 +184,14 @@ runInteraction (InteractionT fm) = do
         modify_ _ { model = model' }
         pure ma'
       ChooseTurnAction_InteractionF (ChooseTurnAction { k }) -> do
-        let
-          initialState _ = {}
-          eval = H.mkEval H.defaultEval
-            { handleAction = \{ selection } -> do
-                -- TODO: validate
-                Console.log $ "selection = " <> show selection
-                H.raise (WidgetOutput $ k { selection })
-            }
-          render {} =
-            HH.div
-              [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
-              [ HH.div [] [ HH.text "Choose what to do on your turn." ]
-              , HH.div
-                  [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
-                  [ HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
-                  , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
-                  , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
-                  ]
-              ]
-        spawnWidget (H.mkComponent { initialState, eval, render })
+        { model } <- get
+        spawnWidget (widget_ChooseTurnAction { model } k)
       ChoosePatchFromCircle_InteractionF (ChoosePatchFromCircle { k }) -> do
-        -- { model: Model model } <- get
-        let
-          initialState _ = {}
-          eval = H.mkEval H.defaultEval
-            { handleAction = \{ selection } -> do
-                -- TODO: validate
-                H.raise (WidgetOutput $ k { selection })
-            }
-          render {} =
-            HH.div
-              [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
-              [ HH.div [] [ HH.text "Choose a patch from the circle." ]
-              , HH.div
-                  [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
-                  [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
-                  , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
-                  , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
-                  ]
-              ]
-        spawnWidget (H.mkComponent { initialState, eval, render })
+        { model } <- get
+        spawnWidget (widget_ChoosePatchFromCircle { model } k)
       PlacePatch_InteractionF (PlacePatch { patchId, k }) -> do
         { model } <- get
-        spawnWidget (placePatchWidget model patchId k)
+        spawnWidget (widget_PlacePatch { model, patchId } k)
       _ -> todo "interpretation"
 
 spawnWidget :: Widget -> H.HalogenM State Action Slots Output Aff (Free (InteractionF (StateT Model Aff)) Unit)
@@ -240,22 +199,80 @@ spawnWidget widget = do
   modify_ _ { mb_widget = Just widget }
   pure (pure unit)
 
-placePatchWidget
-  :: Model
-  -> PatchId
-  -> ( { ori :: PatchOrientation
-       , pos :: QuiltPos
-       , face :: PatchFace
-       }
-       -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit)
-     )
+widget_ChooseTurnAction
+  :: { model :: Model }
+  -> (ChooseTurnAction_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
   -> Widget
-placePatchWidget (Model model) patchId k = H.mkComponent { initialState, eval, render }
+widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState, eval, render }
+  where
+  initialState _ = {}
+  eval = H.mkEval H.defaultEval
+    { handleAction = \{ selection } -> do
+        case selection of
+          Buy -> do
+            -- in order to Buy, must be able to afford at least one of the next 3 patches
+            let Player player = Model model # getActivePlayer
+            let p1 /\ p2 /\ p3 = model.circle # nextThreeItemsOfCircle
+            if
+              [ p1, p2, p3 ] # any \pId ->
+                Model model # getPatch pId
+                  # \(Patch patch) ->
+                      player.buttons >= patch.buttonPrice &&
+                        player.time >= patch.durationPrice then
+              pure unit
+            else
+              pure unit
+          Wait -> pure unit
+          Pass -> pure unit
+        Console.log $ "selection = " <> show selection
+        H.raise (WidgetOutput $ k { selection })
+    }
+  render {} =
+    HH.div
+      [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
+      [ HH.div [] [ HH.text "Choose what to do on your turn." ]
+      , HH.div
+          [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+          [ HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
+          , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
+          , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
+          ]
+      ]
+
+widget_ChoosePatchFromCircle
+  :: { model :: Model }
+  -> (ChoosePatchFromCircle_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
+  -> Widget
+widget_ChoosePatchFromCircle { model: _ } k = H.mkComponent { initialState, eval, render }
+  where
+  initialState _ = {}
+  eval = H.mkEval H.defaultEval
+    { handleAction = \{ selection } -> do
+        -- TODO: validate
+        H.raise (WidgetOutput $ k { selection })
+    }
+  render {} =
+    HH.div
+      [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
+      [ HH.div [] [ HH.text "Choose a patch from the circle." ]
+      , HH.div
+          [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+          [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
+          , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
+          , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
+          ]
+      ]
+
+widget_PlacePatch
+  :: { model :: Model, patchId :: PatchId }
+  -> (PlacePatch_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
+  -> Widget
+widget_PlacePatch { model: Model model, patchId } k = H.mkComponent { initialState, eval, render }
   where
   Patch patch = model.patches # Map.lookup patchId # fromMaybe' \_ -> bug "invalid PatchId"
 
   initialState _ =
-    { quilt: model.players ^. at' model.activePlayer ∘ _Player ∘ prop _quilt
+    { quilt: Model model ^. activePlayer ∘ _Player ∘ prop _quilt
     , pos: QuiltPos (0 /\ 0)
     , ori: North
     , face: FaceUp

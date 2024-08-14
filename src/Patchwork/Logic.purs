@@ -94,7 +94,7 @@ buy = do
         # flip (List.foldr identity) (replicate (selection # Three.toInt) shiftCircle :: List _)
         # removeCircleFocus
   _Model ∘ prop _circle .= newCircle
-  Patch patch <- getPatch patchId
+  Patch patch <- gets (getPatch patchId)
   spendButtons patch.buttonPrice
   spendDuration patch.durationPrice
   placePatch patchId
@@ -114,7 +114,7 @@ placePatch
 placePatch patchId = do
   Console.log "[placePatch]"
   playerId <- gets (view (_Model ∘ prop _activePlayer))
-  Patch patch <- getPatch patchId
+  Patch patch <- gets (getPatch patchId)
   { pos, ori, face } <- inject (PlacePatch { patchId, k: pure })
   let quiltLayout = patch.quiltLayout # adjustQuiltLayout pos ori face
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _quilt %=
@@ -132,13 +132,13 @@ spendDuration duration = do
   playerId <- gets (view (_Model ∘ prop _activePlayer))
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _time %= (_ - duration)
 
-getPatch
-  :: forall m. MonadAff m => PatchId -> M m Patch
-getPatch patchId = do
-  patches <- gets (view (_Model ∘ prop _patches))
-  patches
-    # Map.lookup patchId
-    # maybe' (\_ -> unsafeCrashWith $ "invalid PatchId; patchId = " <> show patchId <> "; patches.keys = " <> show (patches # Map.keys)) pure
+-- getPatch
+--   :: forall m. MonadAff m => PatchId -> M m Patch
+-- getPatch patchId = do
+--   patches <- gets (view (_Model ∘ prop _patches))
+--   patches
+--     # Map.lookup patchId
+--     # maybe' (\_ -> unsafeCrashWith $ "invalid PatchId; patchId = " <> show patchId <> "; patches.keys = " <> show (patches # Map.keys)) pure
 
 updateWinner
   :: forall m. MonadAff m => M m Unit

@@ -49,19 +49,22 @@ derive instance Functor m => Functor (Lift m)
 instance Inject Lift where
   inject = InteractionT <<< liftF <<< Lift_InteractionF
 
-newtype ChooseTurnAction m (a :: Type) = ChooseTurnAction { k :: { selection :: TurnAction } -> m a }
+newtype ChooseTurnAction m (a :: Type) = ChooseTurnAction { k :: ChooseTurnAction_Result -> m a }
+type ChooseTurnAction_Result = { selection :: TurnAction }
 
 derive instance Functor m => Functor (ChooseTurnAction m)
 instance Inject ChooseTurnAction where
   inject = InteractionT <<< liftF <<< ChooseTurnAction_InteractionF
 
-newtype ChoosePatchFromCircle m (a :: Type) = ChoosePatchFromCircle { k :: { selection :: Three } -> m a }
+newtype ChoosePatchFromCircle m (a :: Type) = ChoosePatchFromCircle { k :: ChoosePatchFromCircle_Result -> m a }
+type ChoosePatchFromCircle_Result = { selection :: Three }
 
 derive instance Functor m => Functor (ChoosePatchFromCircle m)
 instance Inject ChoosePatchFromCircle where
   inject = InteractionT <<< liftF <<< ChoosePatchFromCircle_InteractionF
 
-newtype PlacePatch m (a :: Type) = PlacePatch { patchId :: PatchId, k :: { pos :: QuiltPos, ori :: PatchOrientation, face :: PatchFace } -> m a }
+newtype PlacePatch m (a :: Type) = PlacePatch { patchId :: PatchId, k :: PlacePatch_Result -> m a }
+type PlacePatch_Result = { pos :: QuiltPos, ori :: PatchOrientation, face :: PatchFace }
 
 derive instance Functor m => Functor (PlacePatch m)
 instance Inject PlacePatch where
