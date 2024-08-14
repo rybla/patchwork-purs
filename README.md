@@ -10,8 +10,8 @@ bun run Simple1
 - [x] validate chosen turn action 
   - [x] can only choose "buy" if you can afford at least one of the patches available to buy
   - [x] can only choose "wait" if you have non-0 time left
-- [ ] validate button/time spend
-  - [ ] this must happen inside of widget, before raising output
+- [x] validate button/time spend
+  - [x] this must happen inside of widget, before raising output
 - [ ] validate patch placement
   - [ ] this must happen inside of widget, before raising output
 - [ ] rules for collecting leathers when spend certain amounts of time first

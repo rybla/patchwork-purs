@@ -85,6 +85,7 @@ updateActivePlayer = do
 buy
   :: forall m. MonadAff m => M m Unit
 buy = do
+  -- TODO: check for any timemarks passed when spending time
   Console.log "[buy]"
   { selection } <- inject (ChoosePatchFromCircle { k: pure })
   circle <- gets (view (_Model ∘ prop _circle))
@@ -103,10 +104,12 @@ buy = do
 wait
   :: forall m. MonadAff m => M m Unit
 wait = do
+  -- TODO: check for any timemarks passed when waiting
   Console.log "[wait]"
   target <- gets (view (_Model ∘ prop _activePlayer))
   { duration } <- inject (ChooseWaitDuration { k: pure })
   _Model ∘ prop _players ∘ at' target ∘ _Player ∘ prop _time %= (_ + duration)
+  _Model ∘ prop _players ∘ at' target ∘ _Player ∘ prop _buttons %= (_ + (duration + 1))
 
 -- | Run interaction where player places patch on their quilt.
 placePatch

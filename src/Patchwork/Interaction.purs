@@ -70,7 +70,8 @@ derive instance Functor m => Functor (PlacePatch m)
 instance Inject PlacePatch where
   inject = InteractionT <<< liftF <<< PlacePatch_InteractionF
 
-newtype ChooseWaitDuration m (a :: Type) = ChooseWaitDuration { k :: { duration :: Int } -> m a }
+newtype ChooseWaitDuration m (a :: Type) = ChooseWaitDuration { k :: ChooseWaitDuration_Result -> m a }
+type ChooseWaitDuration_Result = { duration :: Int }
 
 derive instance Functor m => Functor (ChooseWaitDuration m)
 instance Inject ChooseWaitDuration where

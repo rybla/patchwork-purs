@@ -9,6 +9,7 @@ import Control.Monad.State (StateT, get, modify, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
 import Data.Foldable (any)
+import Data.Int as Int
 import Data.Lens ((%=), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -30,6 +31,7 @@ import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.HTML.Properties as InputType
 import Halogen.Query.Event as HQE
 import Halogen.VDom.Driver as HVD
 import Partial.Unsafe (unsafeCrashWith)
@@ -40,6 +42,7 @@ import Type.Proxy (Proxy(..))
 import Web.Event.Event as Event
 import Web.HTML as Web
 import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.HTMLInputElement as HTMLInputElement
 import Web.HTML.Window as Window
 import Web.UIEvent.KeyboardEvent (KeyboardEvent)
 import Web.UIEvent.KeyboardEvent as KE
@@ -189,6 +192,9 @@ runInteraction (InteractionT fm) = do
       ChoosePatchFromCircle_InteractionF (ChoosePatchFromCircle { k }) -> do
         { model } <- get
         spawnWidget (widget_ChoosePatchFromCircle { model } k)
+      ChooseWaitDuration_InteractionF (ChooseWaitDuration { k }) -> do
+        { model } <- get
+        spawnWidget (widget_ChooseWaitDuration { model } k)
       PlacePatch_InteractionF (PlacePatch { patchId, k }) -> do
         { model } <- get
         spawnWidget (widget_PlacePatch { model, patchId } k)
@@ -277,6 +283,51 @@ widget_ChoosePatchFromCircle { model: Model model } k = H.mkComponent { initialS
               [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
               , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
               , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
+              ]
+          ]
+        , mb_err # maybe [] \err ->
+            [ HH.div [ HP.style "color: red" ] [ HH.text err ] ]
+        ] # Array.fold
+      )
+
+widget_ChooseWaitDuration
+  :: { model :: Model }
+  -> (ChooseWaitDuration_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
+  -> Widget
+widget_ChooseWaitDuration { model: Model model } k = H.mkComponent { initialState, eval, render }
+  where
+  input_RefLabel = H.RefLabel "input"
+
+  initialState _ =
+    { mb_err: Nothing :: Maybe String
+    }
+  eval = H.mkEval H.defaultEval
+    { handleAction = \{} -> do
+        let Player player = Model model ^. activePlayer
+        inputElem <-
+          H.getHTMLElementRef input_RefLabel
+            # map
+                ( fromMaybe' (\_ -> bug "input must exist")
+                    >>> HTMLInputElement.fromHTMLElement
+                    >>> fromMaybe' (\_ -> bug "input must be an HTMLInputElement")
+                )
+        inputString <- inputElem # HTMLInputElement.value # liftEffect
+        let duration = inputString # Int.fromString # fromMaybe' \_ -> bug "input value must be an Int"
+        if duration <= 0 then
+          modify_ _ { mb_err = Just "The duration to wait must be positive." }
+        else if duration > player.time then
+          modify_ _ { mb_err = Just "The duration to wait must be AT MOST the time you have left." }
+        else
+          H.raise (WidgetOutput (k { duration }))
+    }
+  render { mb_err } =
+    HH.div
+      [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
+      ( [ [ HH.div [] [ HH.text "Choose how much time to wait. You will earn this amount plus 1 in buttons, in addition to any gains from traversing timemarks." ]
+          , HH.div
+              [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+              [ HH.input [ HP.ref input_RefLabel, HP.type_ InputType.InputNumber, HP.value "1" ]
+              , HH.button [ HE.onClick (const {}) ] [ HH.text "Submit" ]
               ]
           ]
         , mb_err # maybe [] \err ->
