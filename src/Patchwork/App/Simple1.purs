@@ -97,6 +97,7 @@ component = H.mkComponent { initialState, eval, render }
               Player
                 { name: [ "Alice", "Bob" ] Array.!! i # fromMaybe' (\_ -> unsafeCrashWith "impossible")
                 , buttons: 5
+                , bonusButtons: 0
                 , quilt: Map.empty
                 , time: 40
                 }
@@ -145,8 +146,8 @@ component = H.mkComponent { initialState, eval, render }
           ]
         , [ HH.div
               [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
-              [ renderPlayer model.patches (model.players ^. at' bottom)
-              , renderPlayer model.patches (model.players ^. at' top)
+              [ renderPlayer (Model model) bottom
+              , renderPlayer (Model model) top
               ]
           ]
         , [ HH.div

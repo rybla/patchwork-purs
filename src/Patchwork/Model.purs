@@ -4,9 +4,10 @@ import Prelude
 
 import Data.Argonaut (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
+import Data.Array ((..))
 import Data.Bifunctor (lmap)
 import Data.Enum (class BoundedEnum, class Enum)
-import Data.Foldable (or)
+import Data.Foldable (foldMap, or)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Iso', Lens', lens', set, (^.))
@@ -71,6 +72,24 @@ getPatch pId (Model model) = model.patches
   # Map.lookup pId
   # fromMaybe' \_ -> bug $ "invalid PatchId: " <> show pId
 
+-- | A player's score is:
+-- |  + number of buttons
+-- |  + number of bonus buttons
+-- |  - 2*(number of squares on board NOT covered by quilt)
+playerScore :: Model -> PlayerId -> Int
+playerScore (Model model) playerId = buttons + bonusButtons - (2 * uncoveredSquares)
+  where
+  Player player = model.players ^. at' playerId
+  buttons = player.buttons
+  bonusButtons = player.bonusButtons
+  uncoveredSquares = Set.difference board (player.quilt # Map.keys) # Set.size
+
+board :: Set QuiltPos
+board = Set.fromFoldable $
+  0 .. boardSize # foldMap \x ->
+    0 .. boardSize # map \y ->
+      QuiltPos (x /\ y)
+
 --------------------------------------------------------------------------------
 -- PlayerId
 --------------------------------------------------------------------------------
@@ -112,6 +131,7 @@ newtype Player = Player
   { name :: String
   , time :: Int
   , buttons :: Int
+  , bonusButtons :: Int
   , quilt :: Quilt
   }
 
@@ -299,6 +319,51 @@ shiftQuiltLayout (QuiltPos (dx /\ dy)) = Set.map $ lmap $ over QuiltPos \(x /\ y
 standardPatches :: Map PatchId Patch
 standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ patch)) $
   [ Patch
+      { durationPrice: 2
+      , buttonPrice: 2
+      , quiltLayout: Set.fromFoldable
+          [ QuiltPos (0 /\ 0) /\ false
+          , QuiltPos (0 /\ 1) /\ true
+          ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
+      }
+  , Patch
+      { durationPrice: 2
+      , buttonPrice: 2
+      , quiltLayout: Set.fromFoldable
+          [ QuiltPos (0 /\ 0) /\ false
+          , QuiltPos (0 /\ 1) /\ true
+          ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
+      }
+  , Patch
+      { durationPrice: 2
+      , buttonPrice: 2
+      , quiltLayout: Set.fromFoldable
+          [ QuiltPos (0 /\ 0) /\ false
+          , QuiltPos (0 /\ 1) /\ true
+          ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
+      }
+  , Patch
+      { durationPrice: 2
+      , buttonPrice: 2
+      , quiltLayout: Set.fromFoldable
+          [ QuiltPos (0 /\ 0) /\ false
+          , QuiltPos (0 /\ 1) /\ true
+          ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
+      }
+  , Patch
+      { durationPrice: 2
+      , buttonPrice: 2
+      , quiltLayout: Set.fromFoldable
+          [ QuiltPos (0 /\ 0) /\ false
+          , QuiltPos (0 /\ 1) /\ true
+          ]
+      , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
+      }
+  , Patch
       { durationPrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable

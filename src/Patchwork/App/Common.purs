@@ -7,10 +7,12 @@ import Data.Array ((..))
 import Data.Array as Array
 import Data.Foldable (foldMap)
 import Data.Int as Int
+import Data.Lens ((^.))
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (fromMaybe')
 import Data.Set as Set
+import Data.TotalMap (at')
 import Data.Tuple.Nested ((/\))
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -20,15 +22,19 @@ import Patchwork.Util (bug, todo)
 
 patchSquareSize = 20.0
 
-renderPlayer :: forall w i. Map PatchId Patch -> Player -> HH.HTML w i
-renderPlayer patches (Player player) =
+renderPlayer :: forall w i. Model -> PlayerId -> HH.HTML w i
+renderPlayer (Model model) playerId =
   HH.div
     [ HP.style "padding: 1em; border: 0.1em solid black; display: flex; flex-direction: column; gap: 1em;" ]
     [ HH.div [] [ HH.text player.name ]
     , HH.div [] [ HH.text ("time: " <> show player.time) ]
     , HH.div [] [ HH.text ("buttons: " <> show player.buttons) ]
-    , renderQuilt patches player.quilt
+    , HH.div [] [ HH.text ("bonus buttons: " <> show player.bonusButtons) ]
+    , HH.div [] [ HH.text ("score: " <> show (playerId # playerScore (Model model))) ]
+    , renderQuilt model.patches player.quilt
     ]
+  where
+  Player player = model.players ^. at' playerId
 
 renderQuilt :: forall w i. Map PatchId Patch -> Quilt -> HH.HTML w i
 renderQuilt patches quilt =
