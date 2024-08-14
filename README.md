@@ -20,7 +20,7 @@ bun run Simple1
 - [x] keep running count of scores
 - [ ] rule for collecting the bonus when you make a 7x7 square
 - [ ] get buttons when you wait
-- [ ] UI for choosing how long to wait
+- [x] UI for choosing how long to wait
 - [ ] get button income when passing certain times
   - [x] count buttons on quilt
 - [x] in addition to time, each player must also keep track of what turn of the
