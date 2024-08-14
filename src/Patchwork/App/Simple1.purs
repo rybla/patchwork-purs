@@ -284,15 +284,27 @@ widget_ChoosePatchFromCircle { model: Model model } k = H.mkComponent { initialS
         else
           modify_ _ { mb_err = Just "You can't afford that patch!" }
     }
+
+  p1 /\ p2 /\ p3 = nextThreePatches model.circle
+
+  renderPatchId selection patchId =
+    HH.div
+      [ HE.onClick (const { selection })
+      , HP.style "border: 0.1em solid blue; box-shadow: 0 0 0 0.2em blue; padding: 1.0em; cursor: pointer;"
+      ]
+      [ renderPatch patch ]
+    where
+    patch = model.patches # Map.lookup patchId # fromMaybe' (\_ -> unsafeCrashWith "impossible: invalid patchId")
+
   render { mb_err } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
       ( [ [ HH.div [] [ HH.text "Choose a patch from the circle." ]
           , HH.div
               [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
-              [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
-              , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
-              , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
+              [ renderPatchId Three.One p1
+              , renderPatchId Three.Two p2
+              , renderPatchId Three.Three p3
               ]
           ]
         , mb_err # maybe [] \err ->
