@@ -213,20 +213,17 @@ widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState,
         case selection of
           Buy -> do
             -- in order to Buy, must be able to afford at least one of the next 3 patches
-            let
-              Player player = Model model # getActivePlayer
-              canAfford (Patch patch) =
-                player.buttons >= patch.buttonPrice &&
-                  player.time >= patch.durationPrice
-              p1 /\ p2 /\ p3 = model.circle # nextThreePatches
+            let player = Model model # getActivePlayer
+            let p1 /\ p2 /\ p3 = model.circle # nextThreePatches
             if
-              not
-                ([ p1, p2, p3 ] # any \patchId -> canAfford (Model model # getPatch patchId)) then
-              modify_ _ { mb_err = Just "You can't afford any of the available patches!" }
-            else
+              [ p1, p2, p3 ]
+                # map (_ `getPatch` Model model)
+                # any (player `canAfford` _) then
               H.raise (WidgetOutput $ k { selection })
+            else
+              modify_ _ { mb_err = Just "You can't afford any of the available patches!" }
           Wait -> do
-            -- can on;y wait if time is not 0
+            -- can only wait if time is not 0
             let Player player = Model model # getActivePlayer
             if player.time == 0 then
               modify_ _ { mb_err = Just "You don't have any more time to wait!" }
@@ -256,25 +253,36 @@ widget_ChoosePatchFromCircle
   :: { model :: Model }
   -> (ChoosePatchFromCircle_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
   -> Widget
-widget_ChoosePatchFromCircle { model: _ } k = H.mkComponent { initialState, eval, render }
+widget_ChoosePatchFromCircle { model: Model model } k = H.mkComponent { initialState, eval, render }
   where
-  initialState _ = {}
+  initialState _ =
+    { mb_err: Nothing :: Maybe String
+    }
   eval = H.mkEval H.defaultEval
     { handleAction = \{ selection } -> do
-        -- TODO: validate
-        H.raise (WidgetOutput $ k { selection })
+        -- validation: can only choose an affordable patch
+        let player = Model model # getActivePlayer
+        let patch = Model model # getPatch (model.circle # getOneOfThreePatches selection)
+        if player `canAfford` patch then
+          H.raise (WidgetOutput $ k { selection })
+        else
+          modify_ _ { mb_err = Just "You can't afford that patch!" }
     }
-  render {} =
+  render { mb_err } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
-      [ HH.div [] [ HH.text "Choose a patch from the circle." ]
-      , HH.div
-          [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
-          [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
-          , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
-          , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
+      ( [ [ HH.div [] [ HH.text "Choose a patch from the circle." ]
+          , HH.div
+              [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+              [ HH.button [ HE.onClick (const { selection: Three.One }) ] [ HH.text "#1" ]
+              , HH.button [ HE.onClick (const { selection: Three.Two }) ] [ HH.text "#2" ]
+              , HH.button [ HE.onClick (const { selection: Three.Three }) ] [ HH.text "#3" ]
+              ]
           ]
-      ]
+        , mb_err # maybe [] \err ->
+            [ HH.div [ HP.style "color: red" ] [ HH.text err ] ]
+        ] # Array.fold
+      )
 
 widget_PlacePatch
   :: { model :: Model, patchId :: PatchId }

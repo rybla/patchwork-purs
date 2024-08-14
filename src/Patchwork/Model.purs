@@ -20,6 +20,8 @@ import Data.Newtype (class Newtype, over)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Show.Generic (genericShow)
+import Data.Three (Three(..))
+import Data.Three as Three
 import Data.TotalMap (TotalMap, at')
 import Data.Tuple.Nested (type (/\), (/\))
 import Halogen.Svg.Attributes (Color)
@@ -122,6 +124,11 @@ derive newtype instance Show Player
 
 type Quilt = Map QuiltPos (PatchId /\ Boolean)
 
+canAfford :: Player -> Patch -> Boolean
+canAfford (Player player) (Patch patch) =
+  player.buttons >= patch.buttonPrice &&
+    player.time >= patch.durationPrice
+
 --------------------------------------------------------------------------------
 -- Patch
 --------------------------------------------------------------------------------
@@ -191,6 +198,12 @@ nextThreePatches :: Circle -> PatchId /\ PatchId /\ PatchId
 nextThreePatches (Circle circle) = case circle.items # List.take 3 of
   a : b : c : _ -> a /\ b /\ c
   _ -> bug "the Circle cannot have less than 3 next patches"
+
+getOneOfThreePatches :: Three -> Circle -> PatchId
+getOneOfThreePatches three (Circle circle) = case three of
+  Three.One -> List.index circle.items 0 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
+  Three.Two -> List.index circle.items 1 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
+  Three.Three -> List.index circle.items 2 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
 
 -- items :: Lens' Circle (List PatchId)
 -- items = _Newtype ∘ prop (Proxy :: Proxy "items")
