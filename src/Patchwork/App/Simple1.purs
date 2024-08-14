@@ -9,10 +9,12 @@ import Control.Monad.State (StateT, get, modify, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
 import Data.Foldable (any)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int as Int
 import Data.Lens ((%=), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List as List
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe', maybe)
 import Data.Newtype (wrap)
@@ -100,8 +102,10 @@ component = H.mkComponent { initialState, eval, render }
                 , bonusButtons: 0
                 , quilt: Map.empty
                 , time: 40
+                , lastTurnPlayed: -1
                 }
           , winner: Nothing
+          , turn: 0
           }
       , mb_widget: Nothing
       }
@@ -154,18 +158,23 @@ component = H.mkComponent { initialState, eval, render }
               [ HP.style "display: flex; flex-direction: row; gap: 1.0em; flex-wrap: wrap;" ]
               let
                 Circle { focus, items } = model.circle
-                renderPatchId patchId =
+                renderPatchId i patchId =
                   let
                     patch = model.patches # Map.lookup patchId # fromMaybe' (\_ -> unsafeCrashWith "impossible: invalid patchId")
                   in
                     HH.div
-                      [ HP.style "border: 0.1em solid black; padding: 1.0em;" ]
+                      [ HP.style
+                          if i < 3 then
+                            "border: 0.1em solid blue; box-shadow: 0 0 0 0.2em blue; padding: 1.0em;"
+                          else
+                            "border: 0.1em solid black; padding: 1.0em;"
+                      ]
                       [ renderPatch patch ]
               in
                 [ items
-                    # map renderPatchId
+                    # mapWithIndex renderPatchId
                     # Array.fromFoldable
-                , [ renderPatchId focus ]
+                , [ renderPatchId (items # List.length) focus ]
                 ]
                   # Array.fold
           ]

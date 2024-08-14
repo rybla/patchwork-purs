@@ -45,6 +45,7 @@ newtype Model = Model
   , players :: TotalMap PlayerId Player
   , activePlayer :: PlayerId
   , winner :: Maybe PlayerId
+  , turn :: Int
   }
 
 _Model = _Newtype :: Iso' Model _
@@ -54,6 +55,7 @@ _players = Proxy :: Proxy "players"
 _activePlayer = Proxy :: Proxy "activePlayer"
 _maxTime = Proxy :: Proxy "maxTime"
 _winner = Proxy :: Proxy "winner"
+_turn = Proxy :: Proxy "turn"
 
 derive instance Newtype Model _
 derive instance Generic Model _
@@ -136,13 +138,16 @@ newtype Player = Player
   , buttons :: Int
   , bonusButtons :: Int
   , quilt :: Quilt
+  , lastTurnPlayed :: Int
   }
 
 _Player = _Newtype :: Iso' Player _
-_time = Proxy :: Proxy "time"
 _name = Proxy :: Proxy "name"
-_quilt = Proxy :: Proxy "quilt"
+_time = Proxy :: Proxy "time"
 _buttons = Proxy :: Proxy "buttons"
+_bonusButtons = Proxy :: Proxy "bonusButtons"
+_quilt = Proxy :: Proxy "quilt"
+_lastTurnPlayed = Proxy :: Proxy "lastTurnPlayed"
 
 derive instance Newtype Player _
 derive instance Generic Player _

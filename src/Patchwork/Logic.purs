@@ -46,12 +46,15 @@ main _ = do
   gets (view (_Model ∘ prop _winner)) >>= case _ of
     Nothing -> do
       Console.log "[main] no winner"
+      turn <- gets (view (_Model ∘ prop _turn))
       -- no winner, so active player takes action
       inject (ChooseTurnAction { k: pure }) >>= case _ of
         { selection: Buy } -> buy
         { selection: Wait } -> wait
         { selection: Pass } -> pure unit
+      activePlayer ∘ _Player ∘ prop _lastTurnPlayed .= turn
       updateActivePlayer
+      _Model ∘ prop _turn %= (_ + 1)
       main unit
     Just _playerId -> do
       Console.log "[main] yes winner"
@@ -60,14 +63,15 @@ main _ = do
   winner <- gets (view (_Model ∘ prop _winner))
   Console.log ("[main] winer = " <> show winner)
 
--- | Set model.activePlayer to be the player with the most time.
+-- | Set model.activePlayer to be the player with the most time, tie broken by
+-- | last turn played.
 updateActivePlayer
   :: forall m. MonadAff m => M m Unit
 updateActivePlayer = do
   Console.log "[updateActivePlayer]"
   playersTimes <- TotalMap.fromFunctionM \playerId -> do
     player <- gets (view (_Model ∘ prop _players ∘ at' playerId ∘ _Player))
-    pure player.time
+    pure (player.time /\ player.lastTurnPlayed)
   let
     activePlayer =
       playersTimes

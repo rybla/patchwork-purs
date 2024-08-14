@@ -23,6 +23,6 @@ bun run Simple1
 - [ ] UI for choosing how long to wait
 - [ ] get button income when passing certain times
   - [x] count buttons on quilt
-- [ ] in addition to time, each player must also keep track of what turn of the
+- [x] in addition to time, each player must also keep track of what turn of the
   game they last moved on, so that when both players have equal time, the player
   that moved on the more recent turn actually gets to move next

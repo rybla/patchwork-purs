@@ -31,6 +31,7 @@ renderPlayer (Model model) playerId =
     , HH.div [] [ HH.text ("buttons: " <> show player.buttons) ]
     , HH.div [] [ HH.text ("bonus buttons: " <> show player.bonusButtons) ]
     , HH.div [] [ HH.text ("quilt buttons: " <> show (player.quilt # quiltButtons)) ]
+    , HH.div [] [ HH.text ("last turn played: " <> show player.lastTurnPlayed) ]
     , HH.div [] [ HH.text ("score: " <> show (playerId # playerScore (Model model))) ]
     , renderQuilt model.patches player.quilt
     ]
