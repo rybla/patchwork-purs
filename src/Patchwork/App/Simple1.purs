@@ -5,7 +5,7 @@ import Patchwork.Model
 import Prelude
 
 import Control.Monad.Free (Free, runFreeM)
-import Control.Monad.State (StateT, get, modify_, runStateT)
+import Control.Monad.State (StateT, get, modify, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
 import Data.Foldable (any)
@@ -205,39 +205,46 @@ widget_ChooseTurnAction
   -> Widget
 widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState, eval, render }
   where
-  initialState _ = {}
+  initialState _ =
+    { mb_err: Nothing :: Maybe String
+    }
   eval = H.mkEval H.defaultEval
     { handleAction = \{ selection } -> do
         case selection of
           Buy -> do
             -- in order to Buy, must be able to afford at least one of the next 3 patches
-            let Player player = Model model # getActivePlayer
-            let p1 /\ p2 /\ p3 = model.circle # nextThreeItemsOfCircle
+            let
+              Player player = Model model # getActivePlayer
+              canAfford (Patch patch) =
+                player.buttons >= patch.buttonPrice &&
+                  player.time >= patch.durationPrice
+              p1 /\ p2 /\ p3 = model.circle # nextThreePatches
             if
-              [ p1, p2, p3 ] # any \pId ->
-                Model model # getPatch pId
-                  # \(Patch patch) ->
-                      player.buttons >= patch.buttonPrice &&
-                        player.time >= patch.durationPrice then
-              pure unit
+              not
+                ([ p1, p2, p3 ] # any \patchId -> canAfford (Model model # getPatch patchId)) then
+              modify_ _ { mb_err = Just "You can't afford any of the available patches!" }
             else
-              pure unit
-          Wait -> pure unit
-          Pass -> pure unit
-        Console.log $ "selection = " <> show selection
-        H.raise (WidgetOutput $ k { selection })
+              H.raise (WidgetOutput $ k { selection })
+          Wait ->
+            H.raise (WidgetOutput $ k { selection })
+          Pass ->
+            H.raise (WidgetOutput $ k { selection })
     }
-  render {} =
+  render { mb_err } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
-      [ HH.div [] [ HH.text "Choose what to do on your turn." ]
-      , HH.div
-          [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
-          [ HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
-          , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
-          , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
+      ( [ [ HH.div [] [ HH.text "Choose what to do on your turn." ]
+          , HH.div
+              [ HP.style "display: flex; flex-direction: row; gap: 1.0em;" ]
+              [ HH.button [ HE.onClick (const { selection: Buy }) ] [ HH.text "Buy" ]
+              , HH.button [ HE.onClick (const { selection: Wait }) ] [ HH.text "Wait" ]
+              , HH.button [ HE.onClick (const { selection: Pass }) ] [ HH.text "Pass" ]
+              ]
           ]
-      ]
+        , mb_err # maybe [] \err ->
+            [ HH.div [ HP.style "color: red" ] [ HH.text err ] ]
+        ] # Array.fold
+      )
 
 widget_ChoosePatchFromCircle
   :: { model :: Model }
