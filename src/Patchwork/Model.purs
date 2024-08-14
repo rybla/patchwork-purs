@@ -7,7 +7,7 @@ import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Array ((..))
 import Data.Bifunctor (lmap)
 import Data.Enum (class BoundedEnum, class Enum)
-import Data.Foldable (foldMap, or)
+import Data.Foldable (foldMap, or, sum)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Iso', Lens', lens', set, (^.))
@@ -83,6 +83,9 @@ playerScore (Model model) playerId = buttons + bonusButtons - (2 * uncoveredSqua
   buttons = player.buttons
   bonusButtons = player.bonusButtons
   uncoveredSquares = Set.difference board (player.quilt # Map.keys) # Set.size
+
+quiltButtons :: Quilt -> Int
+quiltButtons = Map.values >>> map (\(_ /\ btn) -> if btn then 1 else 0) >>> sum
 
 board :: Set QuiltPos
 board = Set.fromFoldable $
