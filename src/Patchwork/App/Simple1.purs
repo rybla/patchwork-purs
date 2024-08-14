@@ -225,9 +225,15 @@ widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState,
               modify_ _ { mb_err = Just "You can't afford any of the available patches!" }
             else
               H.raise (WidgetOutput $ k { selection })
-          Wait ->
-            H.raise (WidgetOutput $ k { selection })
+          Wait -> do
+            -- can on;y wait if time is not 0
+            let Player player = Model model # getActivePlayer
+            if player.time == 0 then
+              modify_ _ { mb_err = Just "You don't have any more time to wait!" }
+            else
+              H.raise (WidgetOutput $ k { selection })
           Pass ->
+            -- can ALWAYS pass
             H.raise (WidgetOutput $ k { selection })
     }
   render { mb_err } =
