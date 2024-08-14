@@ -11,7 +11,6 @@ import Data.Array as Array
 import Data.Lens ((%=), (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe', maybe)
 import Data.Newtype (wrap)
@@ -37,6 +36,7 @@ import Patchwork.App.Common (renderPatch, renderPlayer, renderQuilt)
 import Patchwork.Logic as Logic
 import Patchwork.Util (bug, todo, (∘))
 import Type.Proxy (Proxy(..))
+import Web.Event.Event as Event
 import Web.HTML as Web
 import Web.HTML.HTMLDocument as HTMLDocument
 import Web.HTML.Window as Window
@@ -128,7 +128,9 @@ component = H.mkComponent { initialState, eval, render }
       modify_ _ { model = model' }
       runInteraction (InteractionT fm)
       pure unit
-    Keyboard_Action ke -> H.tell (Proxy :: Proxy "widget") unit $ Keyboard_WidgetQuery ke
+    Keyboard_Action ke -> do
+      ke # KE.toEvent # Event.preventDefault # liftEffect
+      H.tell (Proxy :: Proxy "widget") unit $ Keyboard_WidgetQuery ke
 
   render { mb_widget, model: Model model } =
     HH.div
@@ -191,6 +193,7 @@ runInteraction (InteractionT fm) = do
           initialState _ = {}
           eval = H.mkEval H.defaultEval
             { handleAction = \{ selection } -> do
+                -- TODO: validate
                 Console.log $ "selection = " <> show selection
                 H.raise (WidgetOutput $ k { selection })
             }
@@ -212,6 +215,7 @@ runInteraction (InteractionT fm) = do
           initialState _ = {}
           eval = H.mkEval H.defaultEval
             { handleAction = \{ selection } -> do
+                -- TODO: validate
                 H.raise (WidgetOutput $ k { selection })
             }
           render {} =
@@ -241,6 +245,7 @@ placePatchWidget
   -> PatchId
   -> ( { ori :: PatchOrientation
        , pos :: QuiltPos
+       , face :: PatchFace
        }
        -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit)
      )
@@ -253,6 +258,7 @@ placePatchWidget (Model model) patchId k = H.mkComponent { initialState, eval, r
     { quilt: model.players ^. at' model.activePlayer ∘ _Player ∘ prop _quilt
     , pos: QuiltPos (0 /\ 0)
     , ori: North
+    , face: FaceUp
     }
 
   eval = H.mkEval H.defaultEval
@@ -260,19 +266,25 @@ placePatchWidget (Model model) patchId k = H.mkComponent { initialState, eval, r
         Pure_WidgetQuery a -> pure (Just a)
         Keyboard_WidgetQuery ke a -> do
           case KE.key ke of
+            -- flip
+            "ArrowUp" | KE.shiftKey ke -> prop (Proxy :: Proxy "face") %= nextPathFace
+            "ArrowDown" | KE.shiftKey ke -> prop (Proxy :: Proxy "face") %= nextPathFace
+            -- turn
             "ArrowLeft" | KE.shiftKey ke -> prop (Proxy :: Proxy "ori") %= nextPatchOrientation
             "ArrowRight" | KE.shiftKey ke -> prop (Proxy :: Proxy "ori") %= prevPatchOrientation
+            -- shift
             "ArrowUp" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> (x /\ (y - 1))
             "ArrowDown" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> (x /\ (y + 1))
             "ArrowLeft" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> ((x - 1) /\ y)
             "ArrowRight" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> ((x + 1) /\ y)
             _ -> pure unit
           pure (Just a)
-    , handleAction = \{ pos, ori } -> do
-        H.raise (WidgetOutput $ k { pos, ori })
+    , handleAction = \{ pos, ori, face } -> do
+        -- TODO: validate
+        H.raise (WidgetOutput $ k { pos, ori, face })
     }
 
-  render { quilt, pos, ori } =
+  render { quilt, pos, ori, face } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
       [ HH.div [] [ HH.text "Place the patch on your quilt." ]
@@ -280,7 +292,7 @@ placePatchWidget (Model model) patchId k = H.mkComponent { initialState, eval, r
           [ renderQuilt model.patches
               ( quilt # Map.union
                   ( patch.quiltLayout
-                      # adjustQuiltLayout pos ori
+                      # adjustQuiltLayout pos ori face
                       # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn))
                       # Map.fromFoldable
                   )
@@ -288,7 +300,7 @@ placePatchWidget (Model model) patchId k = H.mkComponent { initialState, eval, r
           ]
       , HH.div []
           [ HH.button
-              [ HE.onClick (const { ori, pos }) ]
+              [ HE.onClick (const { ori, pos, face }) ]
               [ HH.text "Submit" ]
           ]
 

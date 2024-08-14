@@ -1,15 +1,12 @@
 # patchwork-purs
 
-To install dependencies:
-
-```bash
+```sh
 bun install
+bun run Simple1
 ```
 
-To run:
+## TODO
 
-```bash
-bun run index.ts
-```
+- [ ] validate button/time spend
+- [ ] rules for collecting leathers when spend certain amounts of time first
 
-This project was created using `bun init` in bun v1.1.20. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.

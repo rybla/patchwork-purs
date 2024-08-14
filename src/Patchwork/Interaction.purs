@@ -14,7 +14,7 @@ import Data.Newtype (class Newtype)
 import Data.Three (Three(..))
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Patchwork.Model (Circle(..), Patch, PatchId, PatchOrientation, PlayerId, Quilt, QuiltPos(..), TurnAction)
+import Patchwork.Model (Circle(..), Patch, PatchFace, PatchId, PatchOrientation, PlayerId, Quilt, QuiltPos(..), TurnAction)
 
 --------------------------------------------------------------------------------
 -- InteractionF
@@ -61,7 +61,7 @@ derive instance Functor m => Functor (ChoosePatchFromCircle m)
 instance Inject ChoosePatchFromCircle where
   inject = InteractionT <<< liftF <<< ChoosePatchFromCircle_InteractionF
 
-newtype PlacePatch m (a :: Type) = PlacePatch { patchId :: PatchId, k :: { pos :: QuiltPos, ori :: PatchOrientation } -> m a }
+newtype PlacePatch m (a :: Type) = PlacePatch { patchId :: PatchId, k :: { pos :: QuiltPos, ori :: PatchOrientation, face :: PatchFace } -> m a }
 
 derive instance Functor m => Functor (PlacePatch m)
 instance Inject PlacePatch where

@@ -115,8 +115,8 @@ placePatch patchId = do
   Console.log "[placePatch]"
   playerId <- gets (view (_Model ∘ prop _activePlayer))
   Patch patch <- getPatch patchId
-  { pos, ori } <- inject (PlacePatch { patchId, k: pure })
-  let quiltLayout = patch.quiltLayout # adjustQuiltLayout pos ori
+  { pos, ori, face } <- inject (PlacePatch { patchId, k: pure })
+  let quiltLayout = patch.quiltLayout # adjustQuiltLayout pos ori face
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _quilt %=
     Map.union (quiltLayout # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn)) # Map.fromFoldable)
 
