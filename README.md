@@ -27,3 +27,4 @@ bun run Simple1
   game they last moved on, so that when both players have equal time, the player
   that moved on the more recent turn actually gets to move next
 - [x] detect and update winner correctly
+

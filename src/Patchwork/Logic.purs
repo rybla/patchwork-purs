@@ -6,6 +6,7 @@ import Prelude
 
 import Control.Monad.State (StateT, get, gets)
 import Data.Array as Array
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Lens (view, (%=), (.=))
 import Data.Lens.Record (prop)
@@ -110,6 +111,7 @@ buy = do
       circle
         # flip (List.foldr identity) (replicate (selection # Three.toInt) shiftCircle :: List _)
         # removeCircleFocus
+        # lmap (flip (List.foldr identity) (replicate (3 - (selection # Three.toInt)) shiftCircle :: List _))
   _Model ∘ prop _circle .= newCircle
   Patch patch <- gets (getPatch patchId)
   spendButtons patch.buttonPrice
