@@ -33,13 +33,13 @@ renderPlayer patches (Player player) =
 renderQuilt :: forall w i. Map PatchId Patch -> Quilt -> HH.HTML w i
 renderQuilt patches quilt =
   let
-    x_max /\ y_max = 9 /\ 9
+    x_max /\ y_max = (boardSize - 1) /\ (boardSize - 1)
   in
     HSvg.svg
       [ HSvgP.width (Int.toNumber (x_max + 1) * patchSquareSize)
       , HSvgP.height (Int.toNumber (y_max + 1) * patchSquareSize)
       ]
-      ( [ (0 .. 9 # foldMap \x -> 0 .. 9 # map \y -> x /\ y)
+      ( [ (0 .. boardSize # foldMap \x -> 0 .. boardSize # map \y -> x /\ y)
             # foldMap \(x /\ y) ->
                 renderPatchSquare BackgroundPatchStyle
                   { x: Int.toNumber x * patchSquareSize
@@ -158,16 +158,18 @@ renderPatchSquare (SolidColorPatchStyle color) { x, y, size, btn } =
   ] # Array.fold
 
 renderPatchSquare BackgroundPatchStyle { x, y, size } =
-  let strokeWidth = size / 10.0 in 
-  [ HSvg.rect
-      [ HSvgP.x x
-      , HSvgP.y y
-      , HSvgP.width size
-      , HSvgP.height size
-      , HSvgP.fill (HSvgP.RGB 234 182 118)
-      -- , HSvgP.stroke (HSvgP.RGB 0 0 0)
-      , HSvgP.stroke (HSvgP.RGB 158 113 62)
-      , HSvgP.strokeWidth strokeWidth
-      ]
-  ]
+  let
+    strokeWidth = size / 10.0
+  in
+    [ HSvg.rect
+        [ HSvgP.x x
+        , HSvgP.y y
+        , HSvgP.width size
+        , HSvgP.height size
+        , HSvgP.fill (HSvgP.RGB 234 182 118)
+        -- , HSvgP.stroke (HSvgP.RGB 0 0 0)
+        , HSvgP.stroke (HSvgP.RGB 158 113 62)
+        , HSvgP.strokeWidth strokeWidth
+        ]
+    ]
 

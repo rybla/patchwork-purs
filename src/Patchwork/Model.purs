@@ -6,12 +6,13 @@ import Data.Argonaut (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Bifunctor (lmap)
 import Data.Enum (class BoundedEnum, class Enum)
+import Data.Foldable (or)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Iso', Lens', lens', set, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), (:))
+import Data.List (List(..), any, (:))
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
@@ -30,6 +31,8 @@ import Partial.Unsafe (unsafeCrashWith)
 import Patchwork.Util (bug, todo, (∘))
 import Type.Prelude (Proxy(..))
 import Type.Proxy (Proxy)
+
+boardSize = 9
 
 --------------------------------------------------------------------------------
 -- Model
@@ -180,6 +183,14 @@ derive newtype instance Ord QuiltPos
 
 addQuiltPos :: QuiltPos -> QuiltPos -> QuiltPos
 addQuiltPos (QuiltPos (x1 /\ y1)) (QuiltPos (x2 /\ y2)) = QuiltPos ((x1 + x2) /\ (y1 + y2))
+
+isOffBoard :: QuiltPos -> Boolean
+isOffBoard (QuiltPos (x /\ y)) = or
+  [ x < 0
+  , x >= boardSize
+  , y < 0
+  , y >= boardSize
+  ]
 
 --------------------------------------------------------------------------------
 -- Circle

@@ -348,7 +348,14 @@ widget_PlacePatch { model: Model model, patchId } k = H.mkComponent { initialSta
     , pos: QuiltPos (0 /\ 0)
     , ori: North
     , face: FaceUp
+    , mb_err: Nothing :: Maybe String
     }
+
+  newPatchQuiltLayout { pos, ori, face } =
+    patch.quiltLayout
+      # adjustQuiltLayout pos ori face
+      # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn))
+      # Map.fromFoldable
 
   eval = H.mkEval H.defaultEval
     { handleQuery = case _ of
@@ -368,29 +375,35 @@ widget_PlacePatch { model: Model model, patchId } k = H.mkComponent { initialSta
             "ArrowRight" -> prop (Proxy :: Proxy "pos") ∘ _Newtype %= \(x /\ y) -> ((x + 1) /\ y)
             _ -> pure unit
           pure (Just a)
-    , handleAction = \{ pos, ori, face } -> do
-        -- TODO: validate
-        H.raise (WidgetOutput $ k { pos, ori, face })
+    , handleAction = \{} -> do
+        -- validation: a placement is valid if the new patch doesn't overlap
+        -- with any old patches
+        { quilt, pos, ori, face } <- get
+        let quilt' = newPatchQuiltLayout { pos, ori, face }
+        if not (Map.isEmpty (quilt `Map.intersection` quilt')) then
+          modify_ _ { mb_err = Just "You can't place a patch over existing patches" }
+        else if not (quilt' # Map.keys # Set.filter isOffBoard # Set.isEmpty) then
+          modify_ _ { mb_err = Just "You must place the patch ENTIRELY on the board" }
+        else
+          H.raise (WidgetOutput $ k { pos, ori, face })
     }
 
-  render { quilt, pos, ori, face } =
+  render { quilt, pos, ori, face, mb_err } =
     HH.div
       [ HP.style "display: flex; flex-direction: column; gap: 1.0em; border: 0.1em solid black; padding: 1.0em;" ]
-      [ HH.div [] [ HH.text "Place the patch on your quilt." ]
-      , HH.div []
-          [ renderQuilt model.patches
-              ( quilt # Map.union
-                  ( patch.quiltLayout
-                      # adjustQuiltLayout pos ori face
-                      # Set.map (\(pos' /\ btn) -> (pos' /\ patchId /\ btn))
-                      # Map.fromFoldable
+      ( [ [ HH.div [] [ HH.text "Place the patch on your quilt." ]
+          , HH.div []
+              [ renderQuilt model.patches
+                  ( quilt # Map.union (newPatchQuiltLayout { pos, ori, face })
                   )
-              )
+              ]
+          , HH.div []
+              [ HH.button
+                  [ HE.onClick (const {}) ]
+                  [ HH.text "Submit" ]
+              ]
           ]
-      , HH.div []
-          [ HH.button
-              [ HE.onClick (const { ori, pos, face }) ]
-              [ HH.text "Submit" ]
-          ]
-
-      ]
+        , mb_err # maybe [] \err ->
+            [ HH.div [ HP.style "color: red" ] [ HH.text err ] ]
+        ] # Array.fold
+      )
