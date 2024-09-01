@@ -125,7 +125,7 @@ wait = do
   Console.log "[wait]"
   target <- gets (view (_Model ∘ prop _activePlayer))
   { duration } <- inject (ChooseWaitDuration { k: pure })
-  _Model ∘ prop _players ∘ at' target ∘ _Player ∘ prop _time %= (_ + duration)
+  spendDuration duration
   _Model ∘ prop _players ∘ at' target ∘ _Player ∘ prop _buttons %= (_ + (duration + 1))
 
 -- | Run interaction where player places patch on their quilt.
@@ -151,6 +151,13 @@ spendDuration
 spendDuration duration = do
   playerId <- gets (view (_Model ∘ prop _activePlayer))
   _Model ∘ prop _players ∘ at' playerId ∘ _Player ∘ prop _time %= (_ - duration)
+  -- special actions when certain timemarks passed
+  -- collect leathers
+  -- earn income
+  todo ""
+
+inRange :: Int -> { min :: Int, max :: Int } -> Boolean
+inRange x { min, max } = min <= x && x < max
 
 updateWinner
   :: forall m. MonadAff m => M m Unit
