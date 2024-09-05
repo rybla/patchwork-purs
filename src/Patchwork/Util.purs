@@ -6,7 +6,7 @@ import Partial.Unsafe (unsafeCrashWith)
 
 infixr 9 compose as ∘
 
-todo :: forall a. String -> a
+todo :: forall a b. String -> a -> b
 todo msg = unsafeCrashWith ("TODO: " <> msg)
 
 bug :: forall a. String -> a

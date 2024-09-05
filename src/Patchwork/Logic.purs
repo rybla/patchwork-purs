@@ -1,65 +1,92 @@
 module Patchwork.Logic where
 
-import Patchwork.Interaction
-import Patchwork.Model
 import Prelude
 
-import Control.Monad.State (StateT, get, gets)
-import Data.Array as Array
-import Data.Bifunctor (lmap)
+import Control.Monad.State (StateT)
 import Data.Either (Either(..))
-import Data.Lens (view, (%=), (.=))
-import Data.Lens.Record (prop)
-import Data.List (List)
-import Data.List as List
-import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe', maybe')
-import Data.Set as Set
-import Data.Three as Three
-import Data.TotalMap (at')
-import Data.TotalMap as TotalMap
-import Data.Traversable (sequence)
-import Data.Tuple (fst, snd)
-import Data.Tuple.Nested ((/\))
-import Data.Unfoldable (replicate)
+import Data.Either.Nested (type (\/))
+import Data.Three (Three)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console as Console
-import Partial.Unsafe (unsafeCrashWith)
-import Patchwork.Util (bug, todo, (∘))
-import Type.Prelude (Proxy(..))
+import Patchwork.Interaction (InteractionT, chooseTurnAction)
+import Patchwork.Model (Model)
+import Patchwork.Model as Model
+import Patchwork.Util (todo)
 
 --------------------------------------------------------------------------------
--- M
+-- T
 --------------------------------------------------------------------------------
+type T m = InteractionT (StateT Model m)
 
-type M m = InteractionT (StateT Model m)
+type M a = forall m. MonadAff m => T m a
 
 --------------------------------------------------------------------------------
--- Main
+-- main
 --------------------------------------------------------------------------------
-
-main :: forall m. MonadAff m => Unit -> M m Unit
-main _ = do
+main :: M Unit
+main = do
   turn unit
 
-turn :: forall m. MonadAff m => Unit -> M m Unit
+turn :: Unit -> M Unit
 turn _ = do
-  inject (ChooseTurnAction { k: pure }) >>= case _ of
-    { selection: Buy } -> buy
-    { selection: Wait } -> wait
-  endTurn
+  startTurnPhase
+  mainTurnPhase
+  endTurnPhase
 
-wait :: forall m. MonadAff m => M m Unit
+startTurnPhase :: M Unit
+startTurnPhase = pure unit
+
+mainTurnPhase :: M Unit
+mainTurnPhase = do
+  chooseTurnAction_safe unit
+    >>= case _ of
+      { selection: Model.Buy } -> buy
+      { selection: Model.Wait } -> wait
+
+wait :: M Unit
 wait = do
+  { duration } <- chooseWaitDuration_safe unit
+  todo "wait" duration # void
   pure unit
 
-buy :: forall m. MonadAff m => M m Unit
+buy :: M Unit
 buy = do
   pure unit
 
-endTurn :: forall m. MonadAff m => M m Unit
-endTurn = do
+endTurnPhase :: M Unit
+endTurnPhase = do
   -- check for end of game (no valid active player)
   -- update active player
   -- next turn
   turn unit
+
+--------------------------------------------------------------------------------
+-- safe interactions
+--
+-- These versions of the interactions are _safe_ in that they validate
+-- something, requiring backtracking upon an invalid state, before returning.
+-- Mostly used for validating user input, and re-prompting if they input
+-- something invalid.
+--------------------------------------------------------------------------------
+
+chooseTurnAction_safe :: Unit -> M { selection :: Model.TurnAction }
+chooseTurnAction_safe _ = do
+  { selection } <- chooseTurnAction
+  isValidTurnAction selection
+    >>= case _ of
+      Left _msg -> chooseTurnAction_safe unit
+      Right _ -> pure { selection }
+
+choosePatchFromCircle_safe :: Unit -> M { selection :: Three }
+choosePatchFromCircle_safe = todo "choosePatchFromCircle_safe" {}
+
+choosePatchPlacement_safe :: Unit -> M { position :: Model.QuiltPos, orientation :: Model.PatchOrientation, face :: Model.PatchFace }
+choosePatchPlacement_safe = todo "choosePatchPlacement_safe" {}
+
+chooseWaitDuration_safe :: Unit -> M { duration :: Int }
+chooseWaitDuration_safe = do todo "chooseWaitDuration_safe" {}
+
+--------------------------------------------------------------------------------
+-- utilities
+--------------------------------------------------------------------------------
+isValidTurnAction :: Model.TurnAction -> M (String \/ Unit)
+isValidTurnAction = todo "make sure is valid"

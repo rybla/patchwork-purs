@@ -1,11 +1,9 @@
 module Patchwork.App.Simple1 where
 
-import Patchwork.Interaction
-import Patchwork.Model
 import Prelude
 
 import Control.Monad.Free (Free, runFreeM)
-import Control.Monad.State (StateT, get, modify, modify_, runStateT)
+import Control.Monad.State (StateT, get, modify_, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array as Array
 import Data.Foldable (any)
@@ -19,8 +17,8 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe', maybe)
 import Data.Newtype (wrap)
 import Data.Set as Set
+import Data.Three (Three)
 import Data.Three as Three
-import Data.TotalMap (at')
 import Data.TotalMap as TotalMap
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
@@ -38,7 +36,9 @@ import Halogen.Query.Event as HQE
 import Halogen.VDom.Driver as HVD
 import Partial.Unsafe (unsafeCrashWith)
 import Patchwork.App.Common (renderPatch, renderPlayer, renderQuilt)
+import Patchwork.Interaction (InteractionF(..), InteractionT(..), labelInteractionF)
 import Patchwork.Logic as Logic
+import Patchwork.Model (Circle(..), Model(..), Patch(..), PatchFace(..), PatchId, PatchOrientation(..), Player(..), QuiltPos(..), TurnAction(..), _Player, _name, _quilt, activePlayer, adjustQuiltLayout, canAfford, getActivePlayer, getOneOfThreePatches, getPatch, initialCircle, isOffBoard, nextPatchOrientation, nextPathFace, nextThreePatches, prevPatchOrientation, standardPatches)
 import Patchwork.Util (bug, todo, (∘))
 import Type.Proxy (Proxy(..))
 import Web.Event.Event as Event
@@ -122,7 +122,7 @@ component = H.mkComponent { initialState, eval, render }
           (HTMLDocument.toEventTarget document)
           (map Keyboard_Action <<< KE.fromEvent)
       -- start main game logic
-      runInteraction $ Logic.main unit
+      runInteraction Logic.main
     WidgetOutput_Action (WidgetOutput m) -> do
       modify_ _ { mb_widget = Nothing }
       Aff.delay (wrap 100.0) # liftAff -- delay for 100ms to make it feel like things are happening when you click a button, ya know
@@ -191,24 +191,24 @@ runInteraction (InteractionT fm) = do
   fm # runFreeM \interaction -> do
     Console.log $ "[runInteraction] " <> labelInteractionF interaction
     case interaction of
-      Lift_InteractionF (Lift ma) -> do
+      Lift ma -> do
         { model } <- get
         ma' /\ model' <- runStateT ma model # lift
         modify_ _ { model = model' }
         pure ma'
-      ChooseTurnAction_InteractionF (ChooseTurnAction { k }) -> do
+      ChooseTurnAction k -> do
         { model } <- get
         spawnWidget (widget_ChooseTurnAction { model } k)
-      ChoosePatchFromCircle_InteractionF (ChoosePatchFromCircle { k }) -> do
+      ChoosePatchFromCircle k -> do
         { model } <- get
         spawnWidget (widget_ChoosePatchFromCircle { model } k)
-      ChooseWaitDuration_InteractionF (ChooseWaitDuration { k }) -> do
+      ChooseWaitDuration k -> do
         { model } <- get
         spawnWidget (widget_ChooseWaitDuration { model } k)
-      PlacePatch_InteractionF (PlacePatch { patchId, k }) -> do
+      PlacePatch { patchId } k -> do
         { model } <- get
         spawnWidget (widget_PlacePatch { model, patchId } k)
-      _ -> todo "interpretation"
+      _ -> todo "interpretation" {}
 
 spawnWidget :: Widget -> H.HalogenM State Action Slots Output Aff (Free (InteractionF (StateT Model Aff)) Unit)
 spawnWidget widget = do
@@ -217,7 +217,7 @@ spawnWidget widget = do
 
 widget_ChooseTurnAction
   :: { model :: Model }
-  -> (ChooseTurnAction_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
+  -> ({ selection :: TurnAction } -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
   -> Widget
 widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState, eval, render }
   where
@@ -263,7 +263,7 @@ widget_ChooseTurnAction { model: Model model } k = H.mkComponent { initialState,
 
 widget_ChoosePatchFromCircle
   :: { model :: Model }
-  -> (ChoosePatchFromCircle_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
+  -> ({ selection :: Three } -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
   -> Widget
 widget_ChoosePatchFromCircle { model: Model model } k = H.mkComponent { initialState, eval, render }
   where
@@ -310,7 +310,7 @@ widget_ChoosePatchFromCircle { model: Model model } k = H.mkComponent { initialS
 
 widget_ChooseWaitDuration
   :: { model :: Model }
-  -> (ChooseWaitDuration_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
+  -> ({ duration :: Int } -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
   -> Widget
 widget_ChooseWaitDuration { model: Model model } k = H.mkComponent { initialState, eval, render }
   where
@@ -355,7 +355,7 @@ widget_ChooseWaitDuration { model: Model model } k = H.mkComponent { initialStat
 
 widget_PlacePatch
   :: { model :: Model, patchId :: PatchId }
-  -> (PlacePatch_Result -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
+  -> ({ position :: QuiltPos, orientation :: PatchOrientation, face :: PatchFace } -> StateT Model Aff (Free (InteractionF (StateT Model Aff)) Unit))
   -> Widget
 widget_PlacePatch { model: Model model, patchId } k = H.mkComponent { initialState, eval, render }
   where
@@ -403,7 +403,7 @@ widget_PlacePatch { model: Model model, patchId } k = H.mkComponent { initialSta
         else if not (quilt' # Map.keys # Set.filter isOffBoard # Set.isEmpty) then
           modify_ _ { mb_err = Just "You must place the patch ENTIRELY on the board" }
         else
-          H.raise (WidgetOutput $ k { pos, ori, face })
+          H.raise (WidgetOutput $ k { position: pos, orientation: ori, face })
     }
 
   render { quilt, pos, ori, face, mb_err } =
