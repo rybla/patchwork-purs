@@ -78,28 +78,28 @@ renderPatch (Patch patch) =
     [ HP.style "display: flex; flex-direction: column; gap: 0.5em;" ]
     [ HH.div [] [ HH.text $ "button price: " <> show patch.buttonPrice ]
     , HH.div [] [ HH.text $ "time price: " <> show patch.timePrice ]
-    , renderQuiltLayout patch.patchStyle patch.quiltLayout
+    , renderPatchLayout patch.patchStyle patch.patchLayout
     ]
 
-renderQuiltLayout :: forall w i. PatchStyle -> QuiltLayout -> HH.HTML w i
-renderQuiltLayout patchStyle quiltLayout =
+renderPatchLayout :: forall w i. PatchStyle -> PatchLayout -> HH.HTML w i
+renderPatchLayout patchStyle patchLayout =
   let
-    QuiltPos (x_max /\ _) /\ _ = quiltLayout
+    QuiltPos (x_max /\ _) /\ _ = patchLayout
       # Set.toUnfoldable
       # Array.sortBy (\((QuiltPos (x1 /\ _)) /\ _) ((QuiltPos (x2 /\ _)) /\ _) -> compare x1 x2)
       # Array.last
-      # fromMaybe' (\_ -> bug "empty quiltLayout")
-    QuiltPos (_ /\ y_max) /\ _ = quiltLayout
+      # fromMaybe' (\_ -> bug "empty patchLayout")
+    QuiltPos (_ /\ y_max) /\ _ = patchLayout
       # Set.toUnfoldable
       # Array.sortBy (\((QuiltPos (_ /\ y1)) /\ _) ((QuiltPos (_ /\ y2)) /\ _) -> compare y1 y2)
       # Array.last
-      # fromMaybe' (\_ -> bug "empty quiltLayout")
+      # fromMaybe' (\_ -> bug "empty patchLayout")
   in
     HSvg.svg
       [ HSvgP.width (Int.toNumber (x_max + 1) * patchSquareSize)
       , HSvgP.height (Int.toNumber (y_max + 1) * patchSquareSize)
       ]
-      ( quiltLayout
+      ( patchLayout
           # Set.toUnfoldable
           # map
               ( \((QuiltPos (x /\ y)) /\ btn) ->

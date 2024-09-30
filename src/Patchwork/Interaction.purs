@@ -12,7 +12,7 @@ import Control.Monad.Writer.Class (class MonadTell, tell)
 import Data.Identity (Identity)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Patchwork.Model (GameMessage, GameResult, PatchFace, PatchId, PatchOrientation, QuiltPos, TurnAction)
+import Patchwork.Model (GameMessage, GameResult, Patch(..), PatchFace, PatchId, PatchOrientation, QuiltPos, TurnAction)
 
 --------------------------------------------------------------------------------
 -- InteractionF
@@ -25,7 +25,7 @@ data InteractionF m (a :: Type)
   = Lift (m a)
   | ChooseTurnActionUnsafe Unit ({ turnAction :: TurnAction } -> m a)
   | ChoosePatchFromMarketUnsafe Unit ({ patchIndex :: Int } -> m a)
-  | PlacePatchUnsafe { patchId :: PatchId } ({ position :: QuiltPos, orientation :: PatchOrientation, face :: PatchFace } -> m a)
+  | PlacePatchUnsafe { patch :: Patch } ({ position :: QuiltPos, orientation :: PatchOrientation, face :: PatchFace } -> m a)
   | ChooseWaitTimeUnsafe Unit ({ time :: Int } -> m a)
   | SetGameResult { gameResult :: GameResult } (Unit -> m a)
   | PrintGameMessage { gameMessage :: GameMessage } (Unit -> m a)

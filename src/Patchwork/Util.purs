@@ -9,6 +9,8 @@ import Data.Foldable (class Foldable, all, foldMap, foldr, minimumBy)
 import Data.List (List(..))
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
+import Data.Set (Set)
+import Data.Set as Set
 import Data.Tuple.Nested ((/\))
 import Partial.Unsafe (unsafeCrashWith)
 
@@ -47,3 +49,6 @@ fromSingletonList _ = empty
 
 rotateArray :: forall a. Int -> Array a -> Array a
 rotateArray n = Array.splitAt n >>> \{ before, after } -> after <> before
+
+memberBy :: forall a. Ord a => (a -> Boolean) -> Set a -> Maybe a
+memberBy f = Set.filter f >>> Set.findMax

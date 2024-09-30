@@ -187,22 +187,26 @@ getPlayerScore player = todo "getPlayerScore" {}
 newtype Patch = Patch
   { buttonPrice :: Int
   , timePrice :: Int
-  , quiltLayout :: QuiltLayout
+  , patchLayout :: PatchLayout
   , patchStyle :: PatchStyle
   }
 
 -- implicitly, pivot is around (0, 0)
-type QuiltLayout = Set (QuiltPos /\ Boolean)
+-- Boolean indicates if there is a Button present or not
+type PatchLayout = Set (QuiltPos /\ Boolean)
 
 _Patch = _Newtype :: Iso' Patch _
+
 _buttonPrice = prop (Proxy :: Proxy "buttonPrice")
 _timePrice = prop (Proxy :: Proxy "timePrice")
-_quiltLayout = prop (Proxy :: Proxy "quiltLayout")
-_buttonLayout = prop (Proxy :: Proxy "buttonLayout")
+_patchLayout = prop (Proxy :: Proxy "patchLayout")
 
 derive instance Newtype Patch _
 derive instance Generic Patch _
 derive newtype instance Show Patch
+
+fromPatchLayoutToQuilt :: PatchId -> PatchLayout -> Quilt
+fromPatchLayoutToQuilt id = Set.map (\(p /\ btn) -> p /\ id /\ btn) >>> Map.fromFoldable
 
 --------------------------------------------------------------------------------
 -- PatchStyle
@@ -232,13 +236,16 @@ derive newtype instance Ord QuiltPos
 addQuiltPos :: QuiltPos -> QuiltPos -> QuiltPos
 addQuiltPos (QuiltPos (x1 /\ y1)) (QuiltPos (x2 /\ y2)) = QuiltPos ((x1 + x2) /\ (y1 + y2))
 
-isOffBoard :: QuiltPos -> Boolean
-isOffBoard (QuiltPos (x /\ y)) = or
+isOffQuilt :: QuiltPos -> Boolean
+isOffQuilt (QuiltPos (x /\ y)) = or
   [ x < 0
   , x >= boardSize
   , y < 0
   , y >= boardSize
   ]
+
+isOnQuilt :: QuiltPos -> Boolean
+isOnQuilt = not <<< isOffQuilt
 
 --------------------------------------------------------------------------------
 -- Circle
@@ -328,24 +335,24 @@ prevPathFace FaceUp = FaceDown
 prevPathFace FaceDown = FaceUp
 
 --------------------------------------------------------------------------------
--- adjustQuiltLayout
+-- adjustPatchLayout
 --------------------------------------------------------------------------------
 
-adjustQuiltLayout :: QuiltPos -> PatchOrientation -> PatchFace -> QuiltLayout -> QuiltLayout
-adjustQuiltLayout pos ori face = shiftQuiltLayout pos ∘ orientQuiltLayout ori ∘ faceQuiltLayout face
+adjustPatchLayout :: QuiltPos -> PatchOrientation -> PatchFace -> PatchLayout -> PatchLayout
+adjustPatchLayout pos ori face = shiftPatchLayout pos ∘ orientPatchLayout ori ∘ facePatchLayout face
 
-orientQuiltLayout :: PatchOrientation -> QuiltLayout -> QuiltLayout
-orientQuiltLayout North = identity
-orientQuiltLayout East = Set.map $ lmap $ over QuiltPos \(x /\ y) -> y /\ -x
-orientQuiltLayout West = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -y /\ x
-orientQuiltLayout South = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -x /\ -y
+orientPatchLayout :: PatchOrientation -> PatchLayout -> PatchLayout
+orientPatchLayout North = identity
+orientPatchLayout East = Set.map $ lmap $ over QuiltPos \(x /\ y) -> y /\ -x
+orientPatchLayout West = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -y /\ x
+orientPatchLayout South = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -x /\ -y
 
-faceQuiltLayout :: PatchFace -> QuiltLayout -> QuiltLayout
-faceQuiltLayout FaceUp = identity
-faceQuiltLayout FaceDown = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -x /\ -y
+facePatchLayout :: PatchFace -> PatchLayout -> PatchLayout
+facePatchLayout FaceUp = identity
+facePatchLayout FaceDown = Set.map $ lmap $ over QuiltPos \(x /\ y) -> -x /\ -y
 
-shiftQuiltLayout :: QuiltPos -> QuiltLayout -> QuiltLayout
-shiftQuiltLayout (QuiltPos (dx /\ dy)) = Set.map $ lmap $ over QuiltPos \(x /\ y) -> (x + dx) /\ (y + dy)
+shiftPatchLayout :: QuiltPos -> PatchLayout -> PatchLayout
+shiftPatchLayout (QuiltPos (dx /\ dy)) = Set.map $ lmap $ over QuiltPos \(x /\ y) -> (x + dx) /\ (y + dy)
 
 --------------------------------------------------------------------------------
 -- standardPatches
@@ -356,7 +363,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   [ Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -365,7 +372,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -374,7 +381,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -383,7 +390,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -392,7 +399,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -401,7 +408,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -410,7 +417,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 1
       , buttonPrice: 1
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ true
           , QuiltPos (1 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ false
@@ -420,7 +427,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -429,7 +436,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
@@ -438,7 +445,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
   , Patch
       { timePrice: 2
       , buttonPrice: 2
-      , quiltLayout: Set.fromFoldable
+      , patchLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
           , QuiltPos (0 /\ 1) /\ true
           ]
