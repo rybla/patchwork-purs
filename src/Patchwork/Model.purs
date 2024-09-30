@@ -36,7 +36,7 @@ import Patchwork.Util (bug, bug', rotateArray, todo, (∘))
 import Type.Prelude (Proxy(..))
 import Type.Proxy (Proxy)
 
-boardSize = 9
+quiltSize = 9
 
 --------------------------------------------------------------------------------
 -- Model
@@ -93,8 +93,8 @@ quiltButtons = Map.values >>> map (\(_ /\ btn) -> if btn then 1 else 0) >>> sum
 
 board :: Set QuiltPos
 board = Set.fromFoldable $
-  0 .. boardSize # foldMap \x ->
-    0 .. boardSize # map \y ->
+  0 .. quiltSize # foldMap \x ->
+    0 .. quiltSize # map \y ->
       QuiltPos (x /\ y)
 
 --------------------------------------------------------------------------------
@@ -235,9 +235,9 @@ addQuiltPos (QuiltPos (x1 /\ y1)) (QuiltPos (x2 /\ y2)) = QuiltPos ((x1 + x2) /\
 isOffQuilt :: QuiltPos -> Boolean
 isOffQuilt (QuiltPos (x /\ y)) = or
   [ x < 0
-  , x >= boardSize
+  , x >= quiltSize
   , y < 0
-  , y >= boardSize
+  , y >= quiltSize
   ]
 
 isOnQuilt :: QuiltPos -> Boolean
@@ -482,12 +482,12 @@ data GameMessage
 --------------------------------------------------------------------------------
 
 newtype Config = Config
-  { boardSize :: Int
+  { quiltSize :: Int
   , calcWaitResult :: { waitTime :: Int } -> { rewardButtons :: Int }
   }
 
 _Config = _Newtype :: Iso' Config _
-_boardSize = prop (Proxy :: Proxy "boardSize")
+_quiltSize = prop (Proxy :: Proxy "quiltSize")
 _calcWaitResult = prop (Proxy :: Proxy "calcWaitResult")
 
 derive instance Newtype Config _

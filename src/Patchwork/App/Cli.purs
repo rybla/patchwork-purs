@@ -4,6 +4,7 @@ module Patchwork.App.Cli where
 import Prelude
 
 import Control.Monad.Free (runFreeM)
+import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.State (class MonadState, StateT, evalStateT, gets)
 import Control.Plus (empty)
 import Data.Array as Array
@@ -18,22 +19,23 @@ import Data.TotalMap as TotalMap
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Aff.Class (class MonadAff, liftAff)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Node.Process as Process
 import Node.ReadLine as RL
 import Node.ReadLine.Aff as RLA
-import Patchwork.Interaction (InteractionF(..), InteractionT(..), chooseTurnActionUnsafe)
-import Patchwork.Model (Circle(..), Model(..), Player(..), TurnAction(..), _Player, _name, activePlayer, standardPatches)
+import Patchwork.Interaction (InteractionF(..), InteractionT(..))
+import Patchwork.Logic (choosePatchFromMarket)
+import Patchwork.Model (Circle(..), Config(..), Model(..), Player(..), TurnAction(..), _Model, _Player, _circle, _name, activePlayer, standardPatches)
 import Patchwork.Util (todo)
 
 main :: Effect Unit
 main = launchAff_ do
   let
-    m :: forall m. MonadEffect m => InteractionT (StateT Model m) Unit
+    m :: forall m. MonadAff m => InteractionT (StateT Model (ReaderT Config m)) Unit
     m = do
-      action <- chooseTurnActionUnsafe unit
-      Console.logShow { action }
+      -- chooseTurnActionUnsafe unit >>= Console.logShow
+      choosePatchFromMarket >>= Console.logShow
       pure unit
   let
     model =
@@ -53,13 +55,19 @@ main = launchAff_ do
         }
       where
       patches = standardPatches
+  let
+    config = Config
+      { quiltSize: 8
+      , calcWaitResult: \{ waitTime } -> { rewardButtons: waitTime }
+      }
   _ <-
     m
       # runInteractionT
       # flip evalStateT model
+      # flip runReaderT config
   pure unit
 
-runInteractionT :: InteractionT (StateT Model Aff) Unit -> StateT Model Aff Unit
+runInteractionT :: InteractionT (StateT Model (ReaderT Config Aff)) Unit -> StateT Model (ReaderT Config Aff) Unit
 runInteractionT (InteractionT fm) = do
   fm # runFreeM \interaction -> do
     case interaction of
@@ -75,7 +83,19 @@ runInteractionT (InteractionT fm) = do
             "wait" -> pure Wait
             _ -> empty
         k { turnAction }
-      ChoosePatchFromMarketUnsafe args k -> todo "" {}
+      ChoosePatchFromMarketUnsafe args k -> do
+        circle <- gets $ view $ _Model <<< _circle
+        Console.log "circle:"
+        Console.logShow circle
+        patchIndex <- getInput
+          { choices: ["0", "1", "2"], defaultChoice: "" }
+          "patch index: "
+          case _ of
+            "0" -> pure 0
+            "1" -> pure 1
+            "2" -> pure 2
+            _ -> empty
+        k { patchIndex }
       PlacePatchUnsafe args k -> todo "" {}
       ChooseWaitTimeUnsafe args k -> todo "" {}
       PrintGameMessage args k -> todo "" {}

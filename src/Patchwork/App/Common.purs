@@ -40,13 +40,13 @@ renderPlayer (Model model) playerId =
 renderQuilt :: forall w i. Map PatchId Patch -> Quilt -> HH.HTML w i
 renderQuilt patches quilt =
   let
-    x_max /\ y_max = (boardSize - 1) /\ (boardSize - 1)
+    x_max /\ y_max = (quiltSize - 1) /\ (quiltSize - 1)
   in
     HSvg.svg
       [ HSvgP.width (Int.toNumber (x_max + 1) * patchSquareSize)
       , HSvgP.height (Int.toNumber (y_max + 1) * patchSquareSize)
       ]
-      ( [ (0 .. boardSize # foldMap \x -> 0 .. boardSize # map \y -> x /\ y)
+      ( [ (0 .. quiltSize # foldMap \x -> 0 .. quiltSize # map \y -> x /\ y)
             # foldMap \(x /\ y) ->
                 renderPatchSquare BackgroundPatchStyle
                   { x: Int.toNumber x * patchSquareSize

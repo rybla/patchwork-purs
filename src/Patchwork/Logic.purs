@@ -29,8 +29,12 @@ type M a = forall m. MonadAff m => T m a
 -- main
 --------------------------------------------------------------------------------
 
-main :: Unit -> M GameResult
-main _ = do
+main :: M GameResult
+main = do
+  loop unit
+
+loop :: Unit -> M GameResult
+loop _ = do
   do -- beginning phase
     players :: Array _ <- gets (view (_Model <<< _players <<< to TotalMap.toUnfoldable))
     let
@@ -68,7 +72,7 @@ main _ = do
           # map fst
       pure $ mb_winnerId # maybe Tie Win
     else
-      main unit
+      loop unit
 
 --------------------------------------------------------------------------------
 -- basic actions
