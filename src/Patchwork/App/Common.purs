@@ -31,7 +31,7 @@ renderPlayer (Model model) playerId =
     , HH.div [] [ HH.text ("buttons: " <> show player.buttons) ]
     , HH.div [] [ HH.text ("bonus buttons: " <> show player.bonusButtons) ]
     , HH.div [] [ HH.text ("quilt buttons: " <> show (player.quilt # quiltButtons)) ]
-    , HH.div [] [ HH.text ("last turn played: " <> show player.lastTurnPlayed) ]
+    , HH.div [] [ HH.text ("previous turn: " <> show player.previousTurn) ]
     , HH.div [] [ HH.text ("score: " <> show (playerId # playerScore (Model model))) ]
     , renderQuilt model.patches player.quilt
     ]
@@ -77,7 +77,7 @@ renderPatch (Patch patch) =
   HH.div
     [ HP.style "display: flex; flex-direction: column; gap: 0.5em;" ]
     [ HH.div [] [ HH.text $ "button price: " <> show patch.buttonPrice ]
-    , HH.div [] [ HH.text $ "duration price: " <> show patch.durationPrice ]
+    , HH.div [] [ HH.text $ "time price: " <> show patch.timePrice ]
     , renderQuiltLayout patch.patchStyle patch.quiltLayout
     ]
 

@@ -4,7 +4,7 @@ module Patchwork.Interaction
   , labelInteractionF
   , lift
   , chooseTurnAction
-  , choosePatchFromCircle
+  , choosePatchFromMarket
   , choosePatchPlacement
   , chooseWaitDuration
   , setWinner
@@ -35,7 +35,7 @@ type Interaction = InteractionT Identity
 data InteractionF m (a :: Type)
   = Lift (m a)
   | ChooseTurnAction ({ selection :: TurnAction } -> m a)
-  | ChoosePatchFromCircle ({ selection :: Three } -> m a)
+  | ChoosePatchFromMarket ({ selection :: Three } -> m a)
   | ChoosePatchPlacement { patchId :: PatchId } ({ position :: QuiltPos, orientation :: PatchOrientation, face :: PatchFace } -> m a)
   | ChooseWaitDuration ({ duration :: Int } -> m a)
   | SetWinner { winner :: PlayerId } (m a)
@@ -44,14 +44,14 @@ labelInteractionF :: forall m a. InteractionF m a -> String
 labelInteractionF = case _ of
   Lift _ -> "Lift"
   ChooseTurnAction _ -> "ChooseTurnAction"
-  ChoosePatchFromCircle _ -> "ChoosePatchFromCircle"
+  ChoosePatchFromMarket _ -> "ChoosePatchFromMarket"
   ChoosePatchPlacement _ _ -> "ChoosePatchPlacement"
   ChooseWaitDuration _ -> "ChooseWaitDuration"
   SetWinner _ _ -> "SetWinner"
 
 lift = InteractionT <<< liftF <<< Lift
 chooseTurnAction = InteractionT <<< liftF <<< ChooseTurnAction $ pure
-choosePatchFromCircle = InteractionT <<< liftF <<< ChoosePatchFromCircle $ pure
+choosePatchFromMarket = InteractionT <<< liftF <<< ChoosePatchFromMarket $ pure
 choosePatchPlacement args = InteractionT <<< liftF <<< ChoosePatchPlacement args $ pure
 chooseWaitDuration = InteractionT <<< liftF <<< ChooseWaitDuration $ pure
 setWinner args = InteractionT <<< liftF <<< SetWinner args $ pure

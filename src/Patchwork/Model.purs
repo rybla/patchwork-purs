@@ -2,27 +2,29 @@ module Patchwork.Model where
 
 import Prelude
 
-import Data.Argonaut (class EncodeJson)
-import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Array ((..))
 import Data.Bifunctor (lmap)
+import Data.Bounded.Generic (genericBottom, genericTop)
 import Data.Enum (class BoundedEnum, class Enum)
+import Data.Enum.Generic (genericCardinality, genericFromEnum, genericPred, genericSucc, genericToEnum)
+import Data.Eq.Generic (genericEq)
 import Data.Foldable (foldMap, or, sum)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Lens (Iso', Lens', lens', set, (^.))
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
-import Data.List (List(..), any, (:))
+import Data.List (List(..), (:))
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe, fromMaybe')
 import Data.Newtype (class Newtype, over)
+import Data.Ord.Generic (genericCompare)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.Show.Generic (genericShow)
-import Data.Three (Three(..))
+import Data.Three (Three)
 import Data.Three as Three
 import Data.TotalMap (TotalMap, at')
 import Data.Tuple.Nested (type (/\), (/\))
@@ -49,13 +51,13 @@ newtype Model = Model
   }
 
 _Model = _Newtype :: Iso' Model _
-_patches = Proxy :: Proxy "patches"
-_circle = Proxy :: Proxy "circle"
-_players = Proxy :: Proxy "players"
-_activePlayer = Proxy :: Proxy "activePlayer"
-_maxTime = Proxy :: Proxy "maxTime"
-_winner = Proxy :: Proxy "winner"
-_turn = Proxy :: Proxy "turn"
+_patches = prop (Proxy :: Proxy "patches")
+_circle = prop (Proxy :: Proxy "circle")
+_players = prop (Proxy :: Proxy "players")
+_activePlayer = prop (Proxy :: Proxy "activePlayer")
+_maxTime = prop (Proxy :: Proxy "maxTime")
+_winner = prop (Proxy :: Proxy "winner")
+_turn = prop (Proxy :: Proxy "turn")
 
 derive instance Newtype Model _
 derive instance Generic Model _
@@ -99,22 +101,35 @@ board = Set.fromFoldable $
 -- PlayerId
 --------------------------------------------------------------------------------
 
-newtype PlayerId = PlayerId Boolean
+data PlayerId = Player1 | Player2
 
-derive instance Newtype PlayerId _
 derive instance Generic PlayerId _
-derive newtype instance Eq PlayerId
-derive newtype instance Ord PlayerId
-derive newtype instance Enum PlayerId
-derive newtype instance Bounded PlayerId
-derive newtype instance BoundedEnum PlayerId
 
 instance Show PlayerId where
-  show = case _ of
-    PlayerId false -> "Player 1"
-    PlayerId true -> "Player 2"
+  show x = genericShow x
 
-nextPlayerId (PlayerId b) = PlayerId (not b)
+instance Eq PlayerId where
+  eq x = genericEq x
+
+instance Ord PlayerId where
+  compare x = genericCompare x
+
+instance Enum PlayerId where
+  succ x = genericSucc x
+  pred x = genericPred x
+
+instance Bounded PlayerId where
+  top = genericTop
+  bottom = genericBottom
+
+instance BoundedEnum PlayerId where
+  cardinality = genericCardinality
+  fromEnum x = genericFromEnum x
+  toEnum x = genericToEnum x
+
+nextPlayerId :: PlayerId -> PlayerId
+nextPlayerId Player1 = Player2
+nextPlayerId Player2 = Player1
 
 --------------------------------------------------------------------------------
 -- PatchId
@@ -135,19 +150,20 @@ derive newtype instance Ord PatchId
 newtype Player = Player
   { name :: String
   , time :: Int
+  , previousTime :: Int
   , buttons :: Int
   , bonusButtons :: Int
   , quilt :: Quilt
-  , lastTurnPlayed :: Int
+  , previousTurn :: Int
   }
 
 _Player = _Newtype :: Iso' Player _
-_name = Proxy :: Proxy "name"
-_time = Proxy :: Proxy "time"
-_buttons = Proxy :: Proxy "buttons"
-_bonusButtons = Proxy :: Proxy "bonusButtons"
-_quilt = Proxy :: Proxy "quilt"
-_lastTurnPlayed = Proxy :: Proxy "lastTurnPlayed"
+_name = prop (Proxy :: Proxy "name")
+_time = prop (Proxy :: Proxy "time")
+_buttons = prop (Proxy :: Proxy "buttons")
+_bonusButtons = prop (Proxy :: Proxy "bonusButtons")
+_quilt = prop (Proxy :: Proxy "quilt")
+_previousTurn = prop (Proxy :: Proxy "previousTurn")
 
 derive instance Newtype Player _
 derive instance Generic Player _
@@ -158,7 +174,10 @@ type Quilt = Map QuiltPos (PatchId /\ Boolean)
 canAfford :: Player -> Patch -> Boolean
 canAfford (Player player) (Patch patch) =
   player.buttons >= patch.buttonPrice &&
-    player.time >= patch.durationPrice
+    player.time >= patch.timePrice
+
+getPlayerScore :: Player -> Int
+getPlayerScore player = todo "getPlayerScore" {}
 
 --------------------------------------------------------------------------------
 -- Patch
@@ -166,7 +185,7 @@ canAfford (Player player) (Patch patch) =
 
 newtype Patch = Patch
   { buttonPrice :: Int
-  , durationPrice :: Int
+  , timePrice :: Int
   , quiltLayout :: QuiltLayout
   , patchStyle :: PatchStyle
   }
@@ -175,10 +194,10 @@ newtype Patch = Patch
 type QuiltLayout = Set (QuiltPos /\ Boolean)
 
 _Patch = _Newtype :: Iso' Patch _
-_buttonPrice = Proxy :: Proxy "buttonPrice"
-_durationPrice = Proxy :: Proxy "durationPrice"
-_quiltLayout = Proxy :: Proxy "quiltLayout"
-_buttonLayout = Proxy :: Proxy "buttonLayout"
+_buttonPrice = prop (Proxy :: Proxy "buttonPrice")
+_timePrice = prop (Proxy :: Proxy "timePrice")
+_quiltLayout = prop (Proxy :: Proxy "quiltLayout")
+_buttonLayout = prop (Proxy :: Proxy "buttonLayout")
 
 derive instance Newtype Patch _
 derive instance Generic Patch _
@@ -327,7 +346,7 @@ shiftQuiltLayout (QuiltPos (dx /\ dy)) = Set.map $ lmap $ over QuiltPos \(x /\ y
 standardPatches :: Map PatchId Patch
 standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ patch)) $
   [ Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -336,7 +355,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -345,7 +364,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -354,7 +373,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -363,7 +382,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -372,7 +391,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -381,7 +400,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 1
+      { timePrice: 1
       , buttonPrice: 1
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ true
@@ -391,7 +410,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 255 100 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -400,7 +419,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -409,7 +428,7 @@ standardPatches = Map.fromFoldable $ mapWithIndex (\i patch -> (PatchId i /\ pat
       , patchStyle: SolidColorPatchStyle (HSvgA.RGB 100 255 100)
       }
   , Patch
-      { durationPrice: 2
+      { timePrice: 2
       , buttonPrice: 2
       , quiltLayout: Set.fromFoldable
           [ QuiltPos (0 /\ 0) /\ false
@@ -425,3 +444,24 @@ initialCircle _seed patches =
     Nil -> unsafeCrashWith "initialCircle with no patches"
     Cons focus_ items -> Circle { focus: focus_, items }
 
+--------------------------------------------------------------------------------
+-- GameResult
+--------------------------------------------------------------------------------
+
+data GameResult = Win PlayerId | Tie
+
+--------------------------------------------------------------------------------
+-- Config
+--------------------------------------------------------------------------------
+
+newtype Config = Config
+  { boardSize :: Int
+  , calcWaitResult :: { waitTime :: Int } -> { rewardButtons :: Int }
+  }
+
+_Config = _Newtype :: Iso' Config _
+_boardSize = prop (Proxy :: Proxy "boardSize")
+_calcWaitResult = prop (Proxy :: Proxy "calcWaitResult")
+
+derive instance Newtype Config _
+-- derive newtype instance Show Config
