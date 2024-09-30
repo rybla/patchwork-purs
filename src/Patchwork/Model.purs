@@ -304,6 +304,14 @@ instance Show TurnAction where
 
 data PatchOrientation = North | South | East | West
 
+derive instance Generic PatchOrientation _
+
+instance Show PatchOrientation where
+  show x = genericShow x
+
+instance Eq PatchOrientation where
+  eq x = genericEq x
+
 nextPatchOrientation :: PatchOrientation -> PatchOrientation
 nextPatchOrientation North = East
 nextPatchOrientation East = South
@@ -321,6 +329,14 @@ prevPatchOrientation North = West
 --------------------------------------------------------------------------------
 
 data PatchFace = FaceUp | FaceDown
+
+derive instance Generic PatchFace _
+
+instance Show PatchFace where
+  show x = genericShow x
+
+instance Eq PatchFace where
+  eq x = genericEq x
 
 nextPathFace :: PatchFace -> PatchFace
 nextPathFace FaceUp = FaceDown
