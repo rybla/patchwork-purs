@@ -3,8 +3,9 @@
   "type": "module",
   "scripts": {
     "build": "bun spago build",
-    "Simple1.bundle": "bun spago bundle --module Patchwork.App.Simple1 --outfile ./dist/simple1/main.js",
-    "Simple1": "bun run Simple1.bundle && bun run serve",
+    "cli": "spago run --main Patchwork.App.Cli",
+    "simple1.bundle": "bun spago bundle --module Patchwork.App.Simple1 --outfile ./dist/simple1/main.js",
+    "simple1": "bun run Simple1.bundle && bun run serve",
     "serve": "http-server ./dist"
   },
   "devDependencies": {
