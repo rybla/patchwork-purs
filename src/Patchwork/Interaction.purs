@@ -12,7 +12,7 @@ import Control.Monad.Writer.Class (class MonadTell, tell)
 import Data.Identity (Identity)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Patchwork.Model (GameMessage, GameResult, Patch(..), PatchFace, PatchId, PatchOrientation, QuiltPos, TurnAction)
+import Patchwork.Model (GameMessage, GameResult, Patch, PatchFace, PatchOrientation, QuiltPos, TurnAction)
 
 --------------------------------------------------------------------------------
 -- InteractionF
@@ -27,7 +27,6 @@ data InteractionF m (a :: Type)
   | ChoosePatchFromMarketUnsafe Unit ({ patchIndex :: Int } -> m a)
   | PlacePatchUnsafe { patch :: Patch } ({ position :: QuiltPos, orientation :: PatchOrientation, face :: PatchFace } -> m a)
   | ChooseWaitTimeUnsafe Unit ({ time :: Int } -> m a)
-  | SetGameResult { gameResult :: GameResult } (Unit -> m a)
   | PrintGameMessage { gameMessage :: GameMessage } (Unit -> m a)
 
 labelInteractionF :: forall m a. InteractionF m a -> String
@@ -37,7 +36,6 @@ labelInteractionF = case _ of
   ChoosePatchFromMarketUnsafe _ _ -> "ChoosePatchFromMarketUnsafe"
   PlacePatchUnsafe _ _ -> "PlacePatchUnsafe"
   ChooseWaitTimeUnsafe _ _ -> "ChooseWaitTimeUnsafe"
-  SetGameResult _ _ -> "SetGameResult"
   PrintGameMessage _ _ -> "PrintGameMessage"
 
 lift :: forall m a. m a -> InteractionT m a
@@ -47,7 +45,6 @@ chooseTurnActionUnsafe args = InteractionT <<< liftF <<< ChooseTurnActionUnsafe 
 choosePatchFromMarketUnsafe args = InteractionT <<< liftF <<< ChoosePatchFromMarketUnsafe args $ pure
 placePatchUnsafe args = InteractionT <<< liftF <<< PlacePatchUnsafe args $ pure
 chooseWaitTimeUnsafe args = InteractionT <<< liftF <<< ChooseWaitTimeUnsafe args $ pure
-setGameResult args = InteractionT <<< liftF <<< SetGameResult args $ pure
 printGameMessage args = InteractionT <<< liftF <<< PrintGameMessage args $ pure
 
 derive newtype instance Functor (InteractionT m)

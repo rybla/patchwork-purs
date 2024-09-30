@@ -13,7 +13,7 @@ import Data.TotalMap as TotalMap
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff.Class (class MonadAff)
-import Patchwork.Interaction (InteractionT, choosePatchFromMarketUnsafe, chooseTurnActionUnsafe, chooseWaitTimeUnsafe, placePatchUnsafe, printGameMessage, setGameResult)
+import Patchwork.Interaction (InteractionT, choosePatchFromMarketUnsafe, chooseTurnActionUnsafe, chooseWaitTimeUnsafe, placePatchUnsafe, printGameMessage)
 import Patchwork.Model (Config, GameMessage(..), GameResult(..), Model, Patch, PatchId, PatchLayout, TurnAction(..), _Config, _Model, _Patch, _Player, _activePlayerId, _buttonPrice, _buttons, _calcWaitResult, _circle, _patchLayout, _players, _previousTurn, _quilt, _time, _timePrice, activePlayer, adjustPatchLayout, canAfford, extractPatchFromCircle, fromPatchLayoutToQuilt, getPatch, getPlayerScore, isOnQuilt)
 import Patchwork.Util (bug, bug', fromSingletonList, minimumsBy)
 
@@ -29,7 +29,7 @@ type M a = forall m. MonadAff m => T m a
 -- main
 --------------------------------------------------------------------------------
 
-main :: Unit -> M Unit
+main :: Unit -> M GameResult
 main _ = do
   do -- beginning phase
     players :: Array _ <- gets (view (_Model <<< _players <<< to TotalMap.toUnfoldable))
@@ -66,7 +66,7 @@ main _ = do
           # minimumsBy (\(_ /\ p) (_ /\ p') -> compare (p # getPlayerScore) (p' # getPlayerScore))
           # fromSingletonList
           # map fst
-      setGameResult { gameResult: mb_winnerId # maybe Tie Win }
+      pure $ mb_winnerId # maybe Tie Win
     else
       main unit
 
@@ -124,7 +124,11 @@ choosePatchFromMarket = do
 chooseWaitTime :: M Int
 chooseWaitTime = do
   { time } <- chooseWaitTimeUnsafe unit
-  pure time
+  if not (0 < time) then do
+    printGameMessage { gameMessage: WarningGameMessage "you must wait for a positive amount of time" }
+    chooseWaitTime
+  else
+    pure time
 
 placePatch :: PatchId -> Patch -> M Unit
 placePatch patchId patch = do

@@ -82,11 +82,10 @@ getPatch pId (Model model) = model.patches
 -- |  + number of bonus buttons
 -- |  - 2*(number of squares on board NOT covered by quilt)
 playerScore :: Model -> PlayerId -> Int
-playerScore (Model model) playerId = buttons + bonusButtons - (2 * uncoveredSquares)
+playerScore (Model model) playerId = buttons - (2 * uncoveredSquares)
   where
   Player player = model.players ^. at' playerId
   buttons = player.buttons
-  bonusButtons = player.bonusButtons
   uncoveredSquares = Set.difference board (player.quilt # Map.keys) # Set.size
 
 quiltButtons :: Quilt -> Int
@@ -151,18 +150,15 @@ derive newtype instance Ord PatchId
 newtype Player = Player
   { name :: String
   , time :: Int
-  , previousTime :: Int
-  , buttons :: Int
-  , bonusButtons :: Int
-  , quilt :: Quilt
   , previousTurn :: Int
+  , buttons :: Int
+  , quilt :: Quilt
   }
 
 _Player = _Newtype :: Iso' Player _
 _name = prop (Proxy :: Proxy "name")
 _time = prop (Proxy :: Proxy "time")
 _buttons = prop (Proxy :: Proxy "buttons")
-_bonusButtons = prop (Proxy :: Proxy "bonusButtons")
 _quilt = prop (Proxy :: Proxy "quilt")
 _previousTurn = prop (Proxy :: Proxy "previousTurn")
 
@@ -464,6 +460,14 @@ initialCircle _seed patches =
 --------------------------------------------------------------------------------
 
 data GameResult = Win PlayerId | Tie
+
+derive instance Generic GameResult _
+
+instance Show GameResult where
+  show x = genericShow x
+
+instance Eq GameResult where
+  eq x = genericEq x
 
 --------------------------------------------------------------------------------
 -- GameMessage
