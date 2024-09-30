@@ -11,8 +11,8 @@ import Data.TotalMap as TotalMap
 import Data.Tuple (fst)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff.Class (class MonadAff)
-import Patchwork.Interaction (InteractionT)
-import Patchwork.Model (Config, GameResult(..), Model, PatchId, TurnAction(..), _Config, _Model, _Patch, _Player, _activePlayer, _buttonPrice, _calcWaitResult, _players, _previousTurn, _time, _timePrice, getPatch, getPlayerScore)
+import Patchwork.Interaction (InteractionT, choosePatchFromMarketUnsafe, chooseTurnActionUnsafe, chooseWaitTimeUnsafe, placePatchUnsafe, printGameMessage, setGameResult)
+import Patchwork.Model (Config, GameMessage(..), GameResult(..), Model, PatchId, TurnAction(..), _Config, _Model, _Patch, _Player, _activePlayerId, _buttonPrice, _calcWaitResult, _circle, _players, _previousTurn, _time, _timePrice, activePlayer, extractPatchFromCircle, getPatch, getPlayerScore)
 import Patchwork.Util (bug', fromSingletonList, minimumsBy, todo)
 
 --------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ main _ = do
                   ((p2 ^. _Player <<< _time) /\ (p1 ^. _Player <<< _previousTurn))
             )
         # maybe' (bug' "there must be at least 1 player") fst
-    _Model <<< _activePlayer .= activePlayer
+    _Model <<< _activePlayerId .= activePlayer
   do -- main phase
     chooseTurnAction >>= case _ of
       Wait -> do
@@ -64,7 +64,7 @@ main _ = do
           # minimumsBy (\(_ /\ p) (_ /\ p') -> compare (p # getPlayerScore) (p' # getPlayerScore))
           # fromSingletonList
           # map fst
-      setGameResult (mb_winnerId # maybe Tie Win)
+      setGameResult { gameResult: mb_winnerId # maybe Tie Win }
     else
       main unit
 
@@ -76,6 +76,7 @@ modifyButtons :: (Int -> Int) -> M Unit
 modifyButtons = todo "" {}
 
 -- | applies effect of passing certain time spaces
+-- | if modification results in negative time, set to 0 time instead
 modifyTime :: (Int -> Int) -> M Unit
 modifyTime = todo "" {}
 
@@ -84,20 +85,40 @@ modifyTime = todo "" {}
 --------------------------------------------------------------------------------
 
 chooseTurnAction :: M TurnAction
-chooseTurnAction = todo "" {}
+chooseTurnAction = do
+  { turnAction } <- chooseTurnActionUnsafe unit
+  -- TODO: make sure the player has a possible move
+  pure turnAction
 
 -- | - player picks patch from market
 -- | - patch is removed from market
 -- | - move the market token to where the patch was
 -- | - the chosen patch's PatchId is returned
 choosePatchFromMarket :: M PatchId
-choosePatchFromMarket = todo "" {}
+choosePatchFromMarket = do
+  { patchIndex } <- choosePatchFromMarketUnsafe unit
+  if not (patchIndex < 3) then do
+    printGameMessage { gameMessage: WarningGameMessage "you can't choose that patch" }
+    choosePatchFromMarket
+  else do
+    circle <- gets (view (_Model <<< _circle))
+    let circle' /\ patchId = circle # extractPatchFromCircle patchIndex
+    -- ensure that active player can buy patch
+    if false then do
+      printGameMessage { gameMessage: WarningGameMessage "you can't afford that patch" }
+      choosePatchFromMarket
+    else do
+      _Model <<< _circle .= circle'
+      pure patchId
 
 chooseWaitTime :: M Int
-chooseWaitTime = todo "" {}
-
-setGameResult :: GameResult -> M Unit
-setGameResult = todo "" {}
+chooseWaitTime = do
+  { time } <- chooseWaitTimeUnsafe unit
+  pure time
 
 placePatch :: PatchId -> M Unit
-placePatch = todo "" {}
+placePatch patchId = do
+  { face, orientation, position } <- placePatchUnsafe { patchId }
+  -- check is a valid placement
+  -- update player's board
+  pure unit

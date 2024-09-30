@@ -3,6 +3,7 @@ module Patchwork.Model where
 import Prelude
 
 import Data.Array ((..))
+import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Bounded.Generic (genericBottom, genericTop)
 import Data.Enum (class BoundedEnum, class Enum)
@@ -18,7 +19,7 @@ import Data.List (List(..), (:))
 import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe, fromMaybe')
+import Data.Maybe (Maybe(..), fromMaybe')
 import Data.Newtype (class Newtype, over)
 import Data.Ord.Generic (genericCompare)
 import Data.Set (Set)
@@ -31,7 +32,7 @@ import Data.Tuple.Nested (type (/\), (/\))
 import Halogen.Svg.Attributes (Color)
 import Halogen.Svg.Attributes as HSvgA
 import Partial.Unsafe (unsafeCrashWith)
-import Patchwork.Util (bug, todo, (∘))
+import Patchwork.Util (bug, bug', rotateArray, todo, (∘))
 import Type.Prelude (Proxy(..))
 import Type.Proxy (Proxy)
 
@@ -45,7 +46,7 @@ newtype Model = Model
   { patches :: Map PatchId Patch
   , circle :: Circle
   , players :: TotalMap PlayerId Player
-  , activePlayer :: PlayerId
+  , activePlayerId :: PlayerId
   , winner :: Maybe PlayerId
   , turn :: Int
   }
@@ -54,7 +55,7 @@ _Model = _Newtype :: Iso' Model _
 _patches = prop (Proxy :: Proxy "patches")
 _circle = prop (Proxy :: Proxy "circle")
 _players = prop (Proxy :: Proxy "players")
-_activePlayer = prop (Proxy :: Proxy "activePlayer")
+_activePlayerId = prop (Proxy :: Proxy "activePlayerId")
 _maxTime = prop (Proxy :: Proxy "maxTime")
 _winner = prop (Proxy :: Proxy "winner")
 _turn = prop (Proxy :: Proxy "turn")
@@ -65,11 +66,11 @@ derive newtype instance Show Model
 
 activePlayer :: Lens' Model Player
 activePlayer = lens' \(Model model) ->
-  model.players ^. at' model.activePlayer /\
-    \player -> Model model { players = model.players # set (at' model.activePlayer) player }
+  model.players ^. at' model.activePlayerId /\
+    \player -> Model model { players = model.players # set (at' model.activePlayerId) player }
 
 getActivePlayer :: Model -> Player
-getActivePlayer (Model model) = model.players ^. at' model.activePlayer
+getActivePlayer (Model model) = model.players ^. at' model.activePlayerId
 
 getPatch :: PatchId -> Model -> Patch
 getPatch pId (Model model) = model.patches
@@ -243,38 +244,45 @@ isOffBoard (QuiltPos (x /\ y)) = or
 -- Circle
 --------------------------------------------------------------------------------
 
-newtype Circle = Circle { focus :: PatchId, items :: List PatchId }
+newtype Circle = Circle { patches :: Array PatchId }
 
 derive instance Newtype Circle _
 derive instance Generic Circle _
 derive newtype instance Show Circle
 
-focus :: Lens' Circle PatchId
-focus = _Newtype ∘ prop (Proxy :: Proxy "focus")
+extractPatchFromCircle :: Int -> Circle -> Circle /\ PatchId
+extractPatchFromCircle i (Circle circle) = fromMaybe' (bug' "circle is empty") do
+  { head: patchId, tail: patches } <- circle.patches # rotateArray i # Array.uncons
+  pure (Circle circle { patches = patches } /\ patchId)
 
-nextThreePatches :: Circle -> PatchId /\ PatchId /\ PatchId
-nextThreePatches (Circle circle) = case circle.items # List.take 3 of
-  a : b : c : _ -> a /\ b /\ c
-  _ -> bug "the Circle cannot have less than 3 next patches"
+-- newtype Circle = Circle { focus :: PatchId, items :: List PatchId }
 
-getOneOfThreePatches :: Three -> Circle -> PatchId
-getOneOfThreePatches three (Circle circle) = case three of
-  Three.One -> List.index circle.items 0 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
-  Three.Two -> List.index circle.items 1 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
-  Three.Three -> List.index circle.items 2 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
+-- focus :: Lens' Circle PatchId
+-- focus = _Newtype ∘ prop (Proxy :: Proxy "focus")
 
--- items :: Lens' Circle (List PatchId)
--- items = _Newtype ∘ prop (Proxy :: Proxy "items")
+-- nextThreePatches :: Circle -> PatchId /\ PatchId /\ PatchId
+-- nextThreePatches (Circle circle) = case circle.items # List.take 3 of
+--   a : b : c : _ -> a /\ b /\ c
+--   _ -> bug "the Circle cannot have less than 3 next patches"
 
-shiftCircle :: Circle -> Circle
-shiftCircle (Circle pc) = case pc.items of
-  Nil -> Circle pc
-  Cons item items -> Circle { focus: item, items: List.snoc items pc.focus }
+-- getOneOfThreePatches :: Three -> Circle -> PatchId
+-- getOneOfThreePatches three (Circle circle) = case three of
+--   Three.One -> List.index circle.items 0 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
+--   Three.Two -> List.index circle.items 1 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
+--   Three.Three -> List.index circle.items 2 # fromMaybe' \_ -> bug "the Circle cannot have less than 3 next patches"
 
-removeCircleFocus :: Circle -> Circle /\ PatchId
-removeCircleFocus (Circle pc) = case pc.items of
-  Nil -> unsafeCrashWith "removeCircleFocus on Circle with only 1 item"
-  Cons item items -> Circle { focus: item, items } /\ pc.focus
+-- -- items :: Lens' Circle (List PatchId)
+-- -- items = _Newtype ∘ prop (Proxy :: Proxy "items")
+
+-- shiftCircle :: Circle -> Circle
+-- shiftCircle (Circle pc) = case pc.items of
+--   Nil -> Circle pc
+--   Cons item items -> Circle { focus: item, items: List.snoc items pc.focus }
+
+-- removeCircleFocus :: Circle -> Circle /\ PatchId
+-- removeCircleFocus (Circle pc) = case pc.items of
+--   Nil -> unsafeCrashWith "removeCircleFocus on Circle with only 1 item"
+--   Cons item items -> Circle { focus: item, items } /\ pc.focus
 
 --------------------------------------------------------------------------------
 -- TurnAction
@@ -442,13 +450,21 @@ initialCircle :: Int -> Map PatchId Patch -> Circle
 initialCircle _seed patches =
   case patches # Map.keys # List.fromFoldable of
     Nil -> unsafeCrashWith "initialCircle with no patches"
-    Cons focus_ items -> Circle { focus: focus_, items }
+    Cons focus_ items -> todo "Circle { focus: focus_, items }" {}
 
 --------------------------------------------------------------------------------
 -- GameResult
 --------------------------------------------------------------------------------
 
 data GameResult = Win PlayerId | Tie
+
+--------------------------------------------------------------------------------
+-- GameMessage
+--------------------------------------------------------------------------------
+
+data GameMessage
+  = LogGameMessage String
+  | WarningGameMessage String
 
 --------------------------------------------------------------------------------
 -- Config

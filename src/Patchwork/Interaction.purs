@@ -1,14 +1,4 @@
-module Patchwork.Interaction
-  ( InteractionT(..)
-  , InteractionF(..)
-  , labelInteractionF
-  , lift
-  , chooseTurnAction
-  , choosePatchFromMarket
-  , choosePatchPlacement
-  , chooseWaitDuration
-  , setWinner
-  ) where
+module Patchwork.Interaction where
 
 import Prelude
 
@@ -20,10 +10,9 @@ import Control.Monad.State.Class (class MonadState, state)
 import Control.Monad.Trans.Class (class MonadTrans)
 import Control.Monad.Writer.Class (class MonadTell, tell)
 import Data.Identity (Identity)
-import Data.Three (Three)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Patchwork.Model (PatchFace, PatchId, PatchOrientation, PlayerId, QuiltPos, TurnAction)
+import Patchwork.Model (GameMessage, GameResult, PatchFace, PatchId, PatchOrientation, QuiltPos, TurnAction)
 
 --------------------------------------------------------------------------------
 -- InteractionF
@@ -34,27 +23,32 @@ type Interaction = InteractionT Identity
 
 data InteractionF m (a :: Type)
   = Lift (m a)
-  | ChooseTurnAction ({ selection :: TurnAction } -> m a)
-  | ChoosePatchFromMarket ({ selection :: Three } -> m a)
-  | ChoosePatchPlacement { patchId :: PatchId } ({ position :: QuiltPos, orientation :: PatchOrientation, face :: PatchFace } -> m a)
-  | ChooseWaitDuration ({ duration :: Int } -> m a)
-  | SetWinner { winner :: PlayerId } (m a)
+  | ChooseTurnActionUnsafe Unit ({ turnAction :: TurnAction } -> m a)
+  | ChoosePatchFromMarketUnsafe Unit ({ patchIndex :: Int } -> m a)
+  | PlacePatchUnsafe { patchId :: PatchId } ({ position :: QuiltPos, orientation :: PatchOrientation, face :: PatchFace } -> m a)
+  | ChooseWaitTimeUnsafe Unit ({ time :: Int } -> m a)
+  | SetGameResult { gameResult :: GameResult } (Unit -> m a)
+  | PrintGameMessage { gameMessage :: GameMessage } (Unit -> m a)
 
 labelInteractionF :: forall m a. InteractionF m a -> String
 labelInteractionF = case _ of
   Lift _ -> "Lift"
-  ChooseTurnAction _ -> "ChooseTurnAction"
-  ChoosePatchFromMarket _ -> "ChoosePatchFromMarket"
-  ChoosePatchPlacement _ _ -> "ChoosePatchPlacement"
-  ChooseWaitDuration _ -> "ChooseWaitDuration"
-  SetWinner _ _ -> "SetWinner"
+  ChooseTurnActionUnsafe _ _ -> "ChooseTurnActionUnsafe"
+  ChoosePatchFromMarketUnsafe _ _ -> "ChoosePatchFromMarketUnsafe"
+  PlacePatchUnsafe _ _ -> "PlacePatchUnsafe"
+  ChooseWaitTimeUnsafe _ _ -> "ChooseWaitTimeUnsafe"
+  SetGameResult _ _ -> "SetGameResult"
+  PrintGameMessage _ _ -> "PrintGameMessage"
 
+lift :: forall m a. m a -> InteractionT m a
 lift = InteractionT <<< liftF <<< Lift
-chooseTurnAction = InteractionT <<< liftF <<< ChooseTurnAction $ pure
-choosePatchFromMarket = InteractionT <<< liftF <<< ChoosePatchFromMarket $ pure
-choosePatchPlacement args = InteractionT <<< liftF <<< ChoosePatchPlacement args $ pure
-chooseWaitDuration = InteractionT <<< liftF <<< ChooseWaitDuration $ pure
-setWinner args = InteractionT <<< liftF <<< SetWinner args $ pure
+
+chooseTurnActionUnsafe args = InteractionT <<< liftF <<< ChooseTurnActionUnsafe args $ pure
+choosePatchFromMarketUnsafe args = InteractionT <<< liftF <<< ChoosePatchFromMarketUnsafe args $ pure
+placePatchUnsafe args = InteractionT <<< liftF <<< PlacePatchUnsafe args $ pure
+chooseWaitTimeUnsafe args = InteractionT <<< liftF <<< ChooseWaitTimeUnsafe args $ pure
+setGameResult args = InteractionT <<< liftF <<< SetGameResult args $ pure
+printGameMessage args = InteractionT <<< liftF <<< PrintGameMessage args $ pure
 
 derive newtype instance Functor (InteractionT m)
 derive newtype instance Apply (InteractionT m)

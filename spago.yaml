@@ -11,6 +11,7 @@ package:
     - halogen
     - halogen-svg-elems
     - lists
+    - node-readline
     - prelude
     - profunctor-lenses
     - transformers

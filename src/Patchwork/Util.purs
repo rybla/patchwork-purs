@@ -4,6 +4,7 @@ import Prelude
 
 import Control.Bind (bindFlipped)
 import Control.Plus (empty)
+import Data.Array as Array
 import Data.Foldable (class Foldable, all, foldMap, foldr, minimumBy)
 import Data.List (List(..))
 import Data.List as List
@@ -43,3 +44,6 @@ minimumsBy f = foldr
 fromSingletonList :: forall a. List a -> Maybe a
 fromSingletonList (Cons x Nil) = pure x
 fromSingletonList _ = empty
+
+rotateArray :: forall a. Int -> Array a -> Array a
+rotateArray n = Array.splitAt n >>> \{ before, after } -> after <> before
