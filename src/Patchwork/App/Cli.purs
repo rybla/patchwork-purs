@@ -85,7 +85,6 @@ runInteractionT (InteractionT fm) = do
               _ -> empty
           , invalidChoiceMessage: "valid choices are: " <> show [ "buy", "wait" ]
           }
-
         k { turnAction }
       ChoosePatchFromMarketUnsafe args k -> do
         circle <- gets $ view $ _Model <<< _circle
